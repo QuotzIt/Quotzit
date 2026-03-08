@@ -1,5 +1,10 @@
-// Quotzit v1.2 — edit quotes, accordion notes, Playfair Display UI, mobile-first layout
-import { useState, useRef } from "react";
+// Quotzit v2.0 — Supabase backend, real accounts, cross-device sync
+import { useState, useRef, useEffect } from "react";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const SUPABASE_URL = "https://uxpdancjavdtkasvxskf.supabase.co";
+const SUPABASE_KEY = "sb_publishable_iYxhoWMNdliIddbtvNBFGQ_lLRZ_Xp0";
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── Fonts & Global Styles ─────────────────────────────────────────────────────
 const FontLoader = () => (
@@ -38,7 +43,6 @@ const FontLoader = () => (
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
     }
 
-    /* ── TOPBAR ── */
     .topbar {
       display: flex; align-items: center; justify-content: space-between;
       padding: 12px 24px;
@@ -54,12 +58,8 @@ const FontLoader = () => (
       cursor: pointer;
     }
     .topbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .topbar-greeting {
-      font-family: var(--font-ui); font-style: italic;
-      font-size: 0.88rem; color: rgba(245,239,224,0.55);
-    }
+    .topbar-greeting { font-family: var(--font-ui); font-style: italic; font-size: 0.88rem; color: rgba(245,239,224,0.55); }
 
-    /* ── BUTTONS ── */
     .btn {
       font-family: var(--font-ui); font-size: 0.85rem; font-weight: 700;
       letter-spacing: 0.03em; border: none; cursor: pointer;
@@ -73,7 +73,6 @@ const FontLoader = () => (
     .btn-sm      { font-size: 0.76rem; padding: 5px 11px; }
     .btn-cancel  { background: none; border: 1.5px solid #ddd; color: #999; font-family: var(--font-ui); font-size: 0.85rem; cursor: pointer; padding: 8px 16px; border-radius: 3px; }
 
-    /* ── AUTH ── */
     .auth-screen {
       min-height: 100vh; display: flex; align-items: center; justify-content: center;
       background-color: var(--wall);
@@ -82,8 +81,7 @@ const FontLoader = () => (
     .auth-card {
       background: var(--note-white); border-radius: 2px;
       padding: 44px 38px 36px; width: 370px; max-width: 95vw;
-      box-shadow: 5px 7px 28px rgba(0,0,0,0.38), 0 0 0 1px rgba(0,0,0,0.05);
-      position: relative;
+      box-shadow: 5px 7px 28px rgba(0,0,0,0.38); position: relative;
     }
     .auth-card::before {
       content:''; position:absolute; top:-11px; left:50%; transform:translateX(-50%);
@@ -97,12 +95,8 @@ const FontLoader = () => (
     .auth-toggle { text-align:center; margin-top:14px; font-family:var(--font-ui); font-style:italic; font-size:0.88rem; color:var(--ink-faded); }
     .auth-toggle span { color:#7a4f1e; cursor:pointer; text-decoration:underline; }
 
-    /* ── FORM FIELDS ── */
     .field { margin-bottom: 14px; }
-    .field label {
-      display:block; font-family:var(--font-ui); font-size:0.72rem; font-weight:700;
-      text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-faded); margin-bottom:5px;
-    }
+    .field label { display:block; font-family:var(--font-ui); font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-faded); margin-bottom:5px; }
     .field input, .field select, .field textarea {
       width:100%; font-family:var(--font-hand); font-size:1.05rem;
       padding:9px 12px; border:1.5px solid #d4c4a8; border-radius:2px;
@@ -110,41 +104,22 @@ const FontLoader = () => (
     }
     .field input:focus, .field select:focus, .field textarea:focus { border-color:var(--cork-dark); }
     .field textarea { resize:vertical; min-height:80px; }
-    .date-input {
-      font-family:var(--font-hand)!important; font-size:0.95rem!important;
-      padding:8px 10px!important;
-    }
 
-    /* ── WALL ── */
     .wall-area { padding:24px 20px 60px; max-width:1100px; margin:0 auto; }
     .wall-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:18px; }
     .wall-title { font-family:var(--font-ui); font-size:1.5rem; font-weight:700; color:var(--cream); text-shadow:1px 2px 6px rgba(0,0,0,0.4); }
     .wall-title em { font-style:italic; font-weight:400; opacity:0.7; }
 
-    /* ── TAG ACCORDION ── */
     .tag-accordion { background:rgba(22,34,42,0.5); border-radius:4px; margin-bottom:20px; border:1px solid rgba(255,255,255,0.06); overflow:hidden; }
-    .tag-accordion-header {
-      display:flex; align-items:center; justify-content:space-between;
-      padding:10px 16px; cursor:pointer;
-      font-family:var(--font-ui); font-size:0.76rem; font-weight:700;
-      text-transform:uppercase; letter-spacing:0.1em; color:rgba(245,239,224,0.6);
-      user-select:none; transition:background 0.12s;
-    }
+    .tag-accordion-header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; cursor:pointer; font-family:var(--font-ui); font-size:0.76rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:rgba(245,239,224,0.6); user-select:none; transition:background 0.12s; }
     .tag-accordion-header:hover { background:rgba(255,255,255,0.04); }
     .tag-arrow { font-size:0.62rem; transition:transform 0.2s; }
     .tag-arrow.open { transform:rotate(180deg); }
     .tag-accordion-body { display:flex; flex-wrap:wrap; gap:6px; padding:10px 14px 14px; border-top:1px solid rgba(255,255,255,0.06); }
-    .tag-pill {
-      font-family:var(--font-ui); font-size:0.75rem; font-weight:700;
-      letter-spacing:0.04em; text-transform:lowercase;
-      padding:4px 13px; border-radius:20px; cursor:pointer;
-      border:1.5px solid transparent; transition:all 0.12s;
-      background:rgba(255,255,255,0.1); color:rgba(245,239,224,0.8);
-    }
+    .tag-pill { font-family:var(--font-ui); font-size:0.75rem; font-weight:700; letter-spacing:0.04em; text-transform:lowercase; padding:4px 13px; border-radius:20px; cursor:pointer; border:1.5px solid transparent; transition:all 0.12s; background:rgba(255,255,255,0.1); color:rgba(245,239,224,0.8); }
     .tag-pill:hover { background:rgba(255,255,255,0.18); }
     .tag-pill.active { background:var(--note-yellow); color:var(--ink); box-shadow:2px 2px 6px rgba(0,0,0,0.25); }
 
-    /* ── NOTES GRID ── */
     .notes-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:26px; }
     @media (max-width:480px) {
       .notes-grid { grid-template-columns:1fr; gap:20px; }
@@ -152,99 +127,42 @@ const FontLoader = () => (
       .topbar { padding:10px 14px; }
     }
 
-    /* ── STICKY NOTE ── */
-    .sticky {
-      position:relative; padding:20px 16px 14px; border-radius:2px;
-      box-shadow:3px 5px 16px rgba(0,0,0,0.26), 1px 1px 0 rgba(255,255,255,0.18) inset;
-      transition:transform 0.2s, box-shadow 0.2s;
-      animation:pinDrop 0.3s cubic-bezier(0.34,1.5,0.64,1) both;
-    }
-    @keyframes pinDrop {
-      from { opacity:0; transform:translateY(-14px) rotate(var(--rot,0deg)); }
-      to   { opacity:1; transform:translateY(0)     rotate(var(--rot,0deg)); }
-    }
+    .sticky { position:relative; padding:20px 16px 14px; border-radius:2px; box-shadow:3px 5px 16px rgba(0,0,0,0.26), 1px 1px 0 rgba(255,255,255,0.18) inset; transition:transform 0.2s, box-shadow 0.2s; animation:pinDrop 0.3s cubic-bezier(0.34,1.5,0.64,1) both; }
+    @keyframes pinDrop { from{opacity:0;transform:translateY(-14px) rotate(var(--rot,0deg))} to{opacity:1;transform:translateY(0) rotate(var(--rot,0deg))} }
     .sticky:hover { transform:rotate(0deg) translateY(-5px) scale(1.025)!important; box-shadow:6px 12px 28px rgba(0,0,0,0.34); z-index:10; }
-    .sticky::before {
-      content:''; position:absolute; top:-10px; left:50%; transform:translateX(-50%);
-      width:15px; height:15px; border-radius:50%;
-      background:radial-gradient(circle at 38% 32%, #ff7777, var(--pin-red));
-      box-shadow:0 3px 7px var(--pin-shadow); z-index:2;
-    }
-    .note-yellow { background:#fef08a; }
-    .note-blue   { background:#bfdbfe; }
-    .note-green  { background:#bbf7d0; }
-    .note-pink   { background:#fecdd3; }
-    .note-white  { background:#fafafa; }
+    .sticky::before { content:''; position:absolute; top:-10px; left:50%; transform:translateX(-50%); width:15px; height:15px; border-radius:50%; background:radial-gradient(circle at 38% 32%, #ff7777, var(--pin-red)); box-shadow:0 3px 7px var(--pin-shadow); z-index:2; }
+    .note-yellow{background:#fef08a} .note-blue{background:#bfdbfe} .note-green{background:#bbf7d0} .note-pink{background:#fecdd3} .note-white{background:#fafafa}
 
     .sticky-actions { position:absolute; top:7px; right:8px; display:flex; gap:3px; opacity:0; transition:opacity 0.15s; }
     .sticky:hover .sticky-actions { opacity:1; }
-    @media (hover:none) { .sticky-actions { opacity:1; } }
-    .icon-btn {
-      background:rgba(0,0,0,0.1); border:none; border-radius:3px;
-      width:24px; height:24px; cursor:pointer; font-size:0.75rem;
-      display:flex; align-items:center; justify-content:center; transition:background 0.1s;
-    }
+    @media (hover:none) { .sticky-actions{opacity:1} }
+    .icon-btn { background:rgba(0,0,0,0.1); border:none; border-radius:3px; width:24px; height:24px; cursor:pointer; font-size:0.75rem; display:flex; align-items:center; justify-content:center; transition:background 0.1s; }
     .icon-btn:hover { background:rgba(0,0,0,0.22); }
 
     .sticky-quote { font-size:1.14rem; font-weight:600; line-height:1.42; color:var(--ink); margin-bottom:10px; word-break:break-word; }
-
-    .sticky-summary {
-      font-family:var(--font-ui); font-size:0.72rem; color:#555;
-      display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none; padding:2px 0;
-    }
+    .sticky-summary { font-family:var(--font-ui); font-size:0.72rem; color:#555; display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none; padding:2px 0; }
     .sticky-summary:hover { color:#222; }
     .s-arrow { font-size:0.58rem; transition:transform 0.18s; }
     .s-arrow.open { transform:rotate(180deg); }
-    .sticky-meta {
-      font-family:var(--font-ui); font-size:0.74rem; color:#444;
-      margin-top:8px; display:flex; flex-direction:column; gap:3px;
-      border-top:1px dashed rgba(0,0,0,0.12); padding-top:8px;
-    }
+    .sticky-meta { font-family:var(--font-ui); font-size:0.74rem; color:#444; margin-top:8px; display:flex; flex-direction:column; gap:3px; border-top:1px dashed rgba(0,0,0,0.12); padding-top:8px; }
     .meta-row { display:flex; align-items:center; gap:5px; }
-    .sticky-tag {
-      display:inline-block; margin-top:8px;
-      font-family:var(--font-ui); font-size:0.66rem; font-weight:700;
-      letter-spacing:0.06em; text-transform:lowercase;
-      background:rgba(0,0,0,0.1); border-radius:10px; padding:2px 9px;
-    }
+    .sticky-tag { display:inline-block; margin-top:8px; font-family:var(--font-ui); font-size:0.66rem; font-weight:700; letter-spacing:0.06em; text-transform:lowercase; background:rgba(0,0,0,0.1); border-radius:10px; padding:2px 9px; }
 
-    /* ── MODAL ── */
-    .overlay {
-      position:fixed; inset:0; background:rgba(0,0,0,0.58); backdrop-filter:blur(4px);
-      display:flex; align-items:center; justify-content:center;
-      z-index:200; animation:fadeIn 0.15s ease; padding:16px;
-    }
-    @keyframes fadeIn { from{opacity:0}to{opacity:1} }
-    .modal {
-      background:#fffdf5; width:460px; max-width:100%; max-height:90vh; overflow-y:auto;
-      border-radius:2px; padding:36px 30px 28px;
-      box-shadow:6px 9px 36px rgba(0,0,0,0.45); position:relative;
-      animation:slideUp 0.22s cubic-bezier(0.34,1.4,0.64,1) both;
-    }
-    @keyframes slideUp { from{transform:translateY(28px);opacity:0} to{transform:translateY(0);opacity:1} }
-    .modal::before {
-      content:''; position:absolute; top:-11px; left:50%; transform:translateX(-50%);
-      width:18px; height:18px; border-radius:50%;
-      background:radial-gradient(circle at 38% 32%, #ff7777, var(--pin-red));
-      box-shadow:0 3px 8px var(--pin-shadow);
-    }
+    .overlay { position:fixed; inset:0; background:rgba(0,0,0,0.58); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; z-index:200; animation:fadeIn 0.15s ease; padding:16px; }
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .modal { background:#fffdf5; width:460px; max-width:100%; max-height:90vh; overflow-y:auto; border-radius:2px; padding:36px 30px 28px; box-shadow:6px 9px 36px rgba(0,0,0,0.45); position:relative; animation:slideUp 0.22s cubic-bezier(0.34,1.4,0.64,1) both; }
+    @keyframes slideUp{from{transform:translateY(28px);opacity:0}to{transform:translateY(0);opacity:1}}
+    .modal::before { content:''; position:absolute; top:-11px; left:50%; transform:translateX(-50%); width:18px; height:18px; border-radius:50%; background:radial-gradient(circle at 38% 32%, #ff7777, var(--pin-red)); box-shadow:0 3px 8px var(--pin-shadow); }
     .modal-title { font-family:var(--font-ui); font-size:1.3rem; font-weight:700; color:var(--ink); margin-bottom:20px; }
     .modal-close { position:absolute; top:13px; right:15px; background:none; border:none; font-size:1.2rem; cursor:pointer; color:#bbb; }
     .modal-row { display:flex; gap:10px; }
     .modal-row .field { flex:1; }
     .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:8px; }
 
-    .mic-btn {
-      display:flex; align-items:center; justify-content:center; gap:7px;
-      width:100%; padding:9px 14px; margin-bottom:14px;
-      font-family:var(--font-ui); font-size:0.78rem; font-weight:700;
-      letter-spacing:0.05em; text-transform:uppercase;
-      border:1.5px solid #d4c4a8; border-radius:2px;
-      background:#faf5e8; cursor:pointer; color:var(--ink); transition:all 0.15s;
-    }
+    .mic-btn { display:flex; align-items:center; justify-content:center; gap:7px; width:100%; padding:9px 14px; margin-bottom:14px; font-family:var(--font-ui); font-size:0.78rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; border:1.5px solid #d4c4a8; border-radius:2px; background:#faf5e8; cursor:pointer; color:var(--ink); transition:all 0.15s; }
     .mic-btn:hover { background:#f5eed8; border-color:var(--cork-dark); }
     .mic-btn.listening { background:#fee2e2; border-color:#f87171; color:#991b1b; animation:pulse 1s infinite; }
-    @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4)} 50%{box-shadow:0 0 0 6px rgba(239,68,68,0)} }
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}
 
     .swatch-row { display:flex; gap:8px; margin-top:4px; }
     .swatch { width:28px; height:28px; border-radius:2px; cursor:pointer; border:2px solid rgba(0,0,0,0.12); transition:transform 0.12s,border-color 0.12s,box-shadow 0.12s; }
@@ -261,6 +179,7 @@ const FontLoader = () => (
     .empty-state { text-align:center; padding:64px 20px; font-family:var(--font-ui); color:rgba(245,239,224,0.45); }
     .empty-state h2 { font-size:1.6rem; font-weight:700; font-style:italic; color:rgba(245,239,224,0.7); margin-bottom:10px; }
     .readonly-banner { background:var(--note-yellow); font-family:var(--font-ui); font-size:0.88rem; font-weight:700; text-align:center; padding:10px; color:var(--ink); letter-spacing:0.02em; }
+    .loading { display:flex; align-items:center; justify-content:center; min-height:100vh; font-family:var(--font-ui); font-style:italic; color:rgba(245,239,224,0.6); font-size:1.1rem; }
   `}</style>
 );
 
@@ -284,17 +203,11 @@ const rand = arr => arr[Math.floor(Math.random()*arr.length)];
 const fmtDate = iso => new Date(iso).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
 const fmtTime = iso => new Date(iso).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
 
-// ── LocalStorage DB ───────────────────────────────────────────────────────────
-const DB = {
-  getUser:    ()=>{ try{ return JSON.parse(localStorage.getItem("qz_user")); }catch{ return null; } },
-  setUser:    u =>localStorage.setItem("qz_user",JSON.stringify(u)),
-  clearUser:  ()=>localStorage.removeItem("qz_user"),
-  getUsers:   ()=>{ try{ return JSON.parse(localStorage.getItem("qz_users"))||[]; }catch{ return []; } },
-  saveUsers:  u =>localStorage.setItem("qz_users",JSON.stringify(u)),
-  getQuotes:  ()=>{ try{ return JSON.parse(localStorage.getItem("qz_quotes"))||[]; }catch{ return []; } },
-  saveQuotes: q =>localStorage.setItem("qz_quotes",JSON.stringify(q)),
-  getGroups:  ()=>{ try{ return JSON.parse(localStorage.getItem("qz_groups"))||[]; }catch{ return []; } },
-  saveGroups: g =>localStorage.setItem("qz_groups",JSON.stringify(g)),
+// ── Session storage for current user ─────────────────────────────────────────
+const Session = {
+  get: () => { try{ return JSON.parse(sessionStorage.getItem("qz_user")); }catch{ return null; } },
+  set: u => sessionStorage.setItem("qz_user", JSON.stringify(u)),
+  clear: () => sessionStorage.removeItem("qz_user"),
 };
 
 // ── Speech ────────────────────────────────────────────────────────────────────
@@ -316,28 +229,33 @@ const useSpeech = onResult => {
   return { listening, start, stop };
 };
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
+// ── Auth Screen ───────────────────────────────────────────────────────────────
 const AuthScreen = ({ onAuth }) => {
   const [mode,setMode]   = useState("login");
   const [name,setName]   = useState("");
   const [email,setEmail] = useState("");
   const [pass,setPass]   = useState("");
   const [err,setErr]     = useState("");
+  const [loading,setLoading] = useState(false);
 
-  const submit = () => {
-    setErr("");
-    if (!email||!pass) return setErr("Please fill in all fields.");
-    const users = DB.getUsers();
-    if (mode==="signup") {
-      if (!name) return setErr("Please enter your name.");
-      if (users.find(u=>u.email===email)) return setErr("That email is already registered.");
-      const user={id:Date.now().toString(),name,email,pass};
-      DB.saveUsers([...users,user]); DB.setUser(user); onAuth(user);
-    } else {
-      const user=users.find(u=>u.email===email&&u.pass===pass);
-      if (!user) return setErr("Email or password is incorrect.");
-      DB.setUser(user); onAuth(user);
-    }
+  const submit = async () => {
+    setErr(""); setLoading(true);
+    if (!email||!pass) { setErr("Please fill in all fields."); setLoading(false); return; }
+    try {
+      if (mode==="signup") {
+        if (!name) { setErr("Please enter your name."); setLoading(false); return; }
+        const { data:existing } = await supabase.from("users").select("id").eq("email",email).single();
+        if (existing) { setErr("That email is already registered."); setLoading(false); return; }
+        const { data, error } = await supabase.from("users").insert([{ name, email, pass }]).select().single();
+        if (error) throw error;
+        Session.set(data); onAuth(data);
+      } else {
+        const { data, error } = await supabase.from("users").select("*").eq("email",email).eq("pass",pass).single();
+        if (error||!data) { setErr("Email or password is incorrect."); setLoading(false); return; }
+        Session.set(data); onAuth(data);
+      }
+    } catch(e) { setErr("Something went wrong. Please try again."); }
+    setLoading(false);
   };
 
   return (
@@ -358,8 +276,9 @@ const AuthScreen = ({ onAuth }) => {
           <input type="password" value={pass} onChange={e=>setPass(e.target.value)}
             placeholder="••••••••" onKeyDown={e=>e.key==="Enter"&&submit()} />
         </div>
-        <button className="btn btn-primary" style={{width:"100%",fontSize:"1rem",padding:"12px"}} onClick={submit}>
-          {mode==="login"?"Sign In":"Create Account"}
+        <button className="btn btn-primary" style={{width:"100%",fontSize:"1rem",padding:"12px"}}
+          onClick={submit} disabled={loading}>
+          {loading ? "..." : mode==="login" ? "Sign In" : "Create Account"}
         </button>
         <div className="auth-toggle">
           {mode==="login"
@@ -371,59 +290,68 @@ const AuthScreen = ({ onAuth }) => {
   );
 };
 
-// ── Quote Form (Add + Edit) ───────────────────────────────────────────────────
-const QuoteForm = ({ user, groups, initial, onSave, onClose }) => {
+// ── Quote Form ────────────────────────────────────────────────────────────────
+const QuoteForm = ({ user, myTags, initial, onSave, onClose }) => {
   const now = new Date();
   const toLocalDate = d => new Date(d).toLocaleDateString("en-CA");
   const toLocalTime = d => new Date(d).toTimeString().slice(0,5);
 
-  const [text,   setText]   = useState(initial?.text    ?? "");
-  const [saidBy, setSaidBy] = useState(initial?.saidBy  ?? "");
-  const [loc,    setLoc]    = useState(initial?.location ?? "");
-  const [tag,    setTag]    = useState(initial?.tag      ?? "");
+  const [text,   setText]   = useState(initial?.text     ?? "");
+  const [saidBy, setSaidBy] = useState(initial?.said_by  ?? "");
+  const [loc,    setLoc]    = useState(initial?.location  ?? "");
+  const [tag,    setTag]    = useState(initial?.tag       ?? "");
   const [newTag, setNewTag] = useState("");
   const [showNew,setShowNew]= useState(false);
   const [date,   setDate]   = useState(initial ? toLocalDate(initial.date) : toLocalDate(now));
   const [time,   setTime]   = useState(initial ? toLocalTime(initial.date) : toLocalTime(now));
-  const [color,  setColor]  = useState(initial?.color   ?? "note-yellow");
-  const [font,   setFont]   = useState(initial?.font    ?? "casual");
+  const [color,  setColor]  = useState(initial?.color    ?? "note-yellow");
+  const [font,   setFont]   = useState(initial?.font     ?? "casual");
+  const [saving, setSaving] = useState(false);
 
   const {listening,start,stop} = useSpeech(t=>setText(p=>p?p+" "+t:t));
 
-  const save = () => {
+  const save = async () => {
     if (!text.trim()) return;
+    setSaving(true);
     const finalTag = showNew ? newTag.trim() : tag;
-    onSave({
-      id:         initial?.id ?? Date.now().toString(),
-      text:       text.trim(), saidBy:saidBy.trim(), location:loc.trim(),
-      tag:        finalTag, date: new Date(`${date}T${time}`).toISOString(),
-      authorId:   initial?.authorId   ?? user.id,
-      authorName: initial?.authorName ?? user.name,
+    const record = {
+      text: text.trim(), said_by: saidBy.trim(), location: loc.trim(),
+      tag: finalTag||null, date: new Date(`${date}T${time}`).toISOString(),
+      author_id: user.id, author_name: user.name,
       color, font, rotation: initial?.rotation ?? rand(ROTATIONS),
-    });
-    onClose();
+    };
+    if (initial?.id) {
+      const { data, error } = await supabase.from("quotes").update(record).eq("id",initial.id).select().single();
+      if (!error) onSave(data);
+    } else {
+      const { data, error } = await supabase.from("quotes").insert([record]).select().single();
+      if (!error) onSave(data);
+      // auto-create group if new tag
+      if (finalTag) {
+        const { data:existing } = await supabase.from("groups").select("id").eq("name",finalTag).eq("owner_id",user.id).single();
+        if (!existing) {
+          const { data:grp } = await supabase.from("groups").insert([{name:finalTag,owner_id:user.id}]).select().single();
+          if (grp) await supabase.from("group_members").insert([{group_id:grp.id,user_id:user.id}]);
+        }
+      }
+    }
+    setSaving(false); onClose();
   };
 
-  const myTags = [...new Set(groups.filter(g=>g.members.includes(user.id)).map(g=>g.name))];
-  const selStyle = { width:"100%",fontFamily:"var(--font-hand)",fontSize:"1rem",
-    padding:"9px 12px",border:"1.5px solid #d4c4a8",borderRadius:2,
-    background:"#fffdf5",color:"var(--ink)",outline:"none" };
+  const selStyle = { width:"100%",fontFamily:"var(--font-hand)",fontSize:"1rem", padding:"9px 12px",border:"1.5px solid #d4c4a8",borderRadius:2, background:"#fffdf5",color:"var(--ink)",outline:"none" };
 
   return (
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal">
         <button className="modal-close" onClick={onClose}>✕</button>
         <div className="modal-title">{initial?"Edit Quote ✏️":"Pin a Quote ✦"}</div>
-
         <button className={`mic-btn ${listening?"listening":""}`} onClick={listening?stop:start}>
           {listening?"🎙 Listening… tap to stop":"🎙 Tap to speak the quote"}
         </button>
-
         <div className="field"><label>the quote</label>
           <textarea value={text} onChange={e=>setText(e.target.value)}
             style={{fontFamily:FONT_MAP[font]}} placeholder="what was said?" />
         </div>
-
         <div className="modal-row">
           <div className="field"><label>who said it</label>
             <input value={saidBy} onChange={e=>setSaidBy(e.target.value)} placeholder="name or nickname" />
@@ -432,10 +360,9 @@ const QuoteForm = ({ user, groups, initial, onSave, onClose }) => {
             <input value={loc} onChange={e=>setLoc(e.target.value)} placeholder="lake house, kitchen…" />
           </div>
         </div>
-
         <div className="modal-row">
           <div className="field"><label>date</label>
-            <input type="date" value={date} onChange={e=>setDate(e.target.value)} className="date-input"
+            <input type="date" value={date} onChange={e=>setDate(e.target.value)}
               style={{width:"100%",border:"1.5px solid #d4c4a8",borderRadius:2,background:"#fffdf5",color:"var(--ink)",outline:"none",fontFamily:"var(--font-hand)",fontSize:"0.95rem",padding:"8px 10px"}} />
           </div>
           <div className="field"><label>time</label>
@@ -443,7 +370,6 @@ const QuoteForm = ({ user, groups, initial, onSave, onClose }) => {
               style={{width:"100%",border:"1.5px solid #d4c4a8",borderRadius:2,background:"#fffdf5",color:"var(--ink)",outline:"none",fontFamily:"var(--font-hand)",fontSize:"0.95rem",padding:"8px 10px"}} />
           </div>
         </div>
-
         <div className="field"><label>note color</label>
           <div className="swatch-row">
             {COLOR_OPTIONS.map(c=>(
@@ -452,7 +378,6 @@ const QuoteForm = ({ user, groups, initial, onSave, onClose }) => {
             ))}
           </div>
         </div>
-
         <div className="field"><label>handwriting style</label>
           <div className="font-picker">
             {FONT_OPTIONS.map(f=>(
@@ -461,7 +386,6 @@ const QuoteForm = ({ user, groups, initial, onSave, onClose }) => {
             ))}
           </div>
         </div>
-
         <div className="field">
           <label>tag <span style={{textTransform:"none",fontWeight:400,fontSize:"0.72rem",color:"#bbb",letterSpacing:0}}>(optional)</span></label>
           {!showNew ? (
@@ -472,17 +396,15 @@ const QuoteForm = ({ user, groups, initial, onSave, onClose }) => {
             </select>
           ):(
             <>
-              <input value={newTag} onChange={e=>setNewTag(e.target.value)} placeholder="e.g. girls weekend"
-                style={{...selStyle,marginBottom:4}} />
+              <input value={newTag} onChange={e=>setNewTag(e.target.value)} placeholder="e.g. girls weekend" style={{...selStyle,marginBottom:4}} />
               <span style={{fontFamily:"var(--font-ui)",fontSize:"0.75rem",color:"#999",cursor:"pointer",textDecoration:"underline"}}
                 onClick={()=>{setShowNew(false);setNewTag("");}}>← back to existing tags</span>
             </>
           )}
         </div>
-
         <div className="modal-actions">
           <button className="btn-cancel" onClick={onClose}>cancel</button>
-          <button className="btn btn-primary" onClick={save}>{initial?"Save Changes":"Pin it 📌"}</button>
+          <button className="btn btn-primary" onClick={save} disabled={saving}>{saving?"saving…":initial?"Save Changes":"Pin it 📌"}</button>
         </div>
       </div>
     </div>
@@ -490,26 +412,34 @@ const QuoteForm = ({ user, groups, initial, onSave, onClose }) => {
 };
 
 // ── Share Modal ───────────────────────────────────────────────────────────────
-const ShareModal = ({ tag, userId, groups, onSave, onClose }) => {
-  const [email,setEmail]   = useState("");
-  const [copied,setCopied] = useState(false);
-  const shareUrl = `${window.location.origin}${window.location.pathname}?share=${btoa(tag+"::"+userId)}`;
+const ShareModal = ({ tag, user, onClose }) => {
+  const [email,  setEmail]  = useState("");
+  const [copied, setCopied] = useState(false);
+  const [members,setMembers]= useState([]);
+  const shareUrl = `${window.location.origin}?share=${btoa(tag+"::"+user.id)}`;
   const smsBody  = encodeURIComponent(`Psst! Don't forget what we said! Join ${tag} on Quotzit! ${shareUrl}`);
-  const group    = groups.find(g=>g.name===tag&&g.ownerId===userId);
-  const members  = group ? group.members : [userId];
-  const allUsers = DB.getUsers();
 
-  const invite = () => {
+  useEffect(()=>{
+    const load = async () => {
+      const { data:grp } = await supabase.from("groups").select("id").eq("name",tag).eq("owner_id",user.id).single();
+      if (grp) {
+        const { data:mems } = await supabase.from("group_members").select("user_id, users(name,email)").eq("group_id",grp.id);
+        setMembers(mems||[]);
+      }
+    };
+    load();
+  },[tag,user.id]);
+
+  const invite = async () => {
     if (!email.trim()) return;
-    const invitee = allUsers.find(u=>u.email.toLowerCase()===email.trim().toLowerCase());
+    const { data:invitee } = await supabase.from("users").select("*").eq("email",email.trim().toLowerCase()).single();
     if (!invitee) return alert("No Quotzit account found with that email.");
-    if (members.includes(invitee.id)) return alert("They're already in this group!");
-    const gs = DB.getGroups();
-    const idx = gs.findIndex(g=>g.name===tag&&g.ownerId===userId);
-    if (idx>-1){gs[idx].members.push(invitee.id);}
-    else{gs.push({id:Date.now().toString(),name:tag,ownerId:userId,members:[userId,invitee.id]});}
-    DB.saveGroups(gs); onSave(gs); setEmail("");
+    const { data:grp } = await supabase.from("groups").select("id").eq("name",tag).eq("owner_id",user.id).single();
+    if (!grp) return alert("Group not found.");
+    const { error } = await supabase.from("group_members").insert([{group_id:grp.id,user_id:invitee.id}]);
+    if (error) return alert("They may already be in this group.");
     alert(`${invitee.name} added to "${tag}"!`);
+    setEmail("");
   };
 
   const copy = () => navigator.clipboard.writeText(shareUrl).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2200);});
@@ -519,7 +449,6 @@ const ShareModal = ({ tag, userId, groups, onSave, onClose }) => {
       <div className="modal">
         <button className="modal-close" onClick={onClose}>✕</button>
         <div className="modal-title">Share "{tag}"</div>
-
         <div style={{background:"#fef9e7",border:"1.5px solid #f0d060",borderRadius:3,padding:"14px 16px",marginBottom:18}}>
           <div style={{fontFamily:"var(--font-ui)",fontSize:"0.7rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.09em",color:"#999",marginBottom:6}}>invite by text</div>
           <div style={{fontFamily:"var(--font-hand)",fontSize:"1rem",color:"var(--ink)",fontStyle:"italic",marginBottom:12}}>
@@ -530,25 +459,21 @@ const ShareModal = ({ tag, userId, groups, onSave, onClose }) => {
           </a>
           <div style={{fontFamily:"var(--font-ui)",fontSize:"0.7rem",color:"#bbb",marginTop:7,textAlign:"center"}}>opens Messages with the invite pre-written</div>
         </div>
-
         <div className="section-label">add someone with a Quotzit account</div>
         <div style={{display:"flex",gap:8,marginBottom:4}}>
           <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="their email"
-            style={{flex:1,fontFamily:"var(--font-hand)",fontSize:"1rem",padding:"8px 11px",
-              border:"1.5px solid #d4c4a8",borderRadius:2,background:"#fffdf5",color:"var(--ink)",outline:"none"}} />
+            style={{flex:1,fontFamily:"var(--font-hand)",fontSize:"1rem",padding:"8px 11px",border:"1.5px solid #d4c4a8",borderRadius:2,background:"#fffdf5",color:"var(--ink)",outline:"none"}} />
           <button className="btn btn-primary btn-sm" onClick={invite}>Add</button>
         </div>
-
         <div className="section-label">read-only link</div>
         <div className="share-link-box">{shareUrl}</div>
         <button className="btn btn-sm" style={{background:"none",border:"1.5px solid #ccc",color:"#777",fontFamily:"var(--font-ui)",cursor:"pointer",marginBottom:4}} onClick={copy}>
           {copied?"✓ Copied!":"Copy Link"}
         </button>
-
         <div className="section-label">current members</div>
-        {members.map(mid=>{ const u=allUsers.find(u=>u.id===mid);
-          return <div key={mid} className="invite-item">{u?`${u.name} (${u.email})`:"unknown"}</div>; })}
-
+        {members.map((m,i)=>(
+          <div key={i} className="invite-item">{m.users?.name} ({m.users?.email})</div>
+        ))}
         <div className="modal-actions" style={{marginTop:16}}>
           <button className="btn btn-primary" onClick={onClose}>Done</button>
         </div>
@@ -557,11 +482,11 @@ const ShareModal = ({ tag, userId, groups, onSave, onClose }) => {
   );
 };
 
-// ── Sticky Note Card ──────────────────────────────────────────────────────────
+// ── Sticky Note ───────────────────────────────────────────────────────────────
 const StickyNote = ({ quote, canEdit, canDelete, onEdit, onDelete }) => {
   const [open,setOpen] = useState(false);
   const fontCss = FONT_MAP[quote.font] || "var(--font-hand)";
-  const who  = quote.saidBy   || null;
+  const who  = quote.said_by  || null;
   const where= quote.location || null;
   const when = fmtDate(quote.date);
   const parts = [who&&`👤 ${who}`, where&&`📍 ${where}`, `📅 ${when}`].filter(Boolean);
@@ -577,7 +502,7 @@ const StickyNote = ({ quote, canEdit, canDelete, onEdit, onDelete }) => {
       <div className="sticky-summary" onClick={()=>setOpen(o=>!o)}>
         <span className={`s-arrow ${open?"open":""}`}>▼</span>
         <span style={{flex:1,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>
-          {open ? "hide details" : parts.join(" · ")}
+          {open?"hide details":parts.join(" · ")}
         </span>
       </div>
       {open && (
@@ -585,7 +510,7 @@ const StickyNote = ({ quote, canEdit, canDelete, onEdit, onDelete }) => {
           {who   && <div className="meta-row">👤 {who}</div>}
           {where && <div className="meta-row">📍 {where}</div>}
           <div className="meta-row">📅 {when} at {fmtTime(quote.date)}</div>
-          {quote.authorName && <div className="meta-row" style={{color:"#999",fontSize:"0.68rem"}}>added by {quote.authorName}</div>}
+          {quote.author_name && <div className="meta-row" style={{color:"#999",fontSize:"0.68rem"}}>added by {quote.author_name}</div>}
           {quote.tag && <div><div className="sticky-tag">#{quote.tag}</div></div>}
         </div>
       )}
@@ -601,7 +526,7 @@ const TagAccordion = ({ tags, activeTag, onSelect }) => {
   return (
     <div className="tag-accordion">
       <div className="tag-accordion-header" onClick={()=>setOpen(o=>!o)}>
-        <span>{activeTag ? `Filtered: #${activeTag}` : "Filter by tag"}</span>
+        <span>{activeTag?`Filtered: #${activeTag}`:"Filter by tag"}</span>
         <span className={`tag-arrow ${open?"open":""}`}>▼</span>
       </div>
       {open && (
@@ -621,10 +546,13 @@ const TagAccordion = ({ tags, activeTag, onSelect }) => {
 const ReadOnlyWall = ({ shareParam }) => {
   const [quotes,setQuotes] = useState([]);
   const [tag,setTag]       = useState("");
-  useState(()=>{
-    try{ const [t]=atob(shareParam).split("::"); setTag(t); setQuotes(DB.getQuotes().filter(q=>q.tag===t)); }
-    catch{ setQuotes([]); }
-  });
+  useEffect(()=>{
+    try {
+      const [t] = atob(shareParam).split("::");
+      setTag(t);
+      supabase.from("quotes").select("*").eq("tag",t).order("date",{ascending:false}).then(({data})=>setQuotes(data||[]));
+    } catch { setQuotes([]); }
+  },[]);
   return (
     <div className="app-wrapper"><FontLoader/>
       <div className="readonly-banner">👀 Read-only — <strong>{tag}</strong></div>
@@ -644,32 +572,59 @@ export default function Quotzit() {
   const shareParam = params.get("share");
   if (shareParam) return <ReadOnlyWall shareParam={shareParam}/>;
 
-  const [user,     setUser]    = useState(DB.getUser);
-  const [quotes,   setQuotes]  = useState(DB.getQuotes);
-  const [groups,   setGroups]  = useState(DB.getGroups);
+  const [user,     setUser]    = useState(Session.get);
+  const [quotes,   setQuotes]  = useState([]);
+  const [myTags,   setMyTags]  = useState([]);
   const [activeTag,setActive]  = useState(null);
   const [showAdd,  setShowAdd] = useState(false);
   const [editQ,    setEditQ]   = useState(null);
   const [shareTag, setShare]   = useState(null);
+  const [loading,  setLoading] = useState(false);
 
-  const myGroupNames  = groups.filter(g=>g.members.includes(user?.id)).map(g=>g.name);
-  const myQuotes      = quotes.filter(q=>q.authorId===user?.id||myGroupNames.includes(q.tag));
-  const visibleQuotes = myQuotes.filter(q=>!activeTag||q.tag===activeTag);
-  const myTags        = [...new Set(myQuotes.map(q=>q.tag).filter(Boolean))];
+  const loadQuotes = async (u) => {
+    setLoading(true);
+    // get groups user belongs to
+    const { data:memberships } = await supabase.from("group_members").select("group_id, groups(name)").eq("user_id",u.id);
+    const groupNames = (memberships||[]).map(m=>m.groups?.name).filter(Boolean);
 
-  const saveQuote = q => {
-    const updated = quotes.find(x=>x.id===q.id) ? quotes.map(x=>x.id===q.id?q:x) : [q,...quotes];
-    setQuotes(updated); DB.saveQuotes(updated);
-    if (q.tag && !groups.find(g=>g.name===q.tag&&g.ownerId===user.id)) {
-      const g2=[...groups,{id:Date.now().toString(),name:q.tag,ownerId:user.id,members:[user.id]}];
-      setGroups(g2); DB.saveGroups(g2);
+    // get own quotes + quotes from shared groups
+    let q = [];
+    const { data:own } = await supabase.from("quotes").select("*").eq("author_id",u.id).order("date",{ascending:false});
+    q = [...(own||[])];
+    if (groupNames.length) {
+      const { data:shared } = await supabase.from("quotes").select("*").in("tag",groupNames).neq("author_id",u.id).order("date",{ascending:false});
+      q = [...q,...(shared||[])];
     }
+    // dedupe and sort
+    const seen = new Set(); q = q.filter(x=>{ if(seen.has(x.id)) return false; seen.add(x.id); return true; });
+    q.sort((a,b)=>new Date(b.date)-new Date(a.date));
+    setQuotes(q);
+    setMyTags([...new Set(q.map(x=>x.tag).filter(Boolean))]);
+    setLoading(false);
   };
 
-  const deleteQuote = id => { const u=quotes.filter(q=>q.id!==id); setQuotes(u); DB.saveQuotes(u); };
-  const logout      = ()  => { DB.clearUser(); setUser(null); };
+  useEffect(()=>{ if(user) loadQuotes(user); },[user]);
 
-  if (!user) return <><FontLoader/><AuthScreen onAuth={u=>setUser(u)}/></>;
+  const handleAuth = u => { setUser(u); };
+
+  const saveQuote = q => {
+    setQuotes(prev => {
+      const existing = prev.find(x=>x.id===q.id);
+      return existing ? prev.map(x=>x.id===q.id?q:x) : [q,...prev];
+    });
+    setMyTags(prev=>[...new Set([...prev,q.tag].filter(Boolean))]);
+  };
+
+  const deleteQuote = async id => {
+    await supabase.from("quotes").delete().eq("id",id);
+    setQuotes(prev=>prev.filter(q=>q.id!==id));
+  };
+
+  const logout = () => { Session.clear(); setUser(null); setQuotes([]); setMyTags([]); };
+
+  if (!user) return <><FontLoader/><AuthScreen onAuth={handleAuth}/></>;
+
+  const visibleQuotes = quotes.filter(q=>!activeTag||q.tag===activeTag);
 
   return (
     <div className="app-wrapper">
@@ -687,13 +642,13 @@ export default function Quotzit() {
       <div className="wall-area">
         <div className="wall-header">
           <div className="wall-title">
-            {activeTag ? <><em>#</em>{activeTag}</> : <>The Wall <em>✦</em></>}
+            {activeTag?<><em>#</em>{activeTag}</>:<>The Wall <em>✦</em></>}
           </div>
         </div>
-
         <TagAccordion tags={myTags} activeTag={activeTag} onSelect={setActive}/>
-
-        {visibleQuotes.length===0 ? (
+        {loading ? (
+          <div className="empty-state"><h2>loading your wall…</h2></div>
+        ) : visibleQuotes.length===0 ? (
           <div className="empty-state">
             <h2>{activeTag?`Nothing tagged #${activeTag} yet`:"Nothing pinned yet"}</h2>
             <p>hit "Pin Quote" up top to save your first one</p>
@@ -702,8 +657,8 @@ export default function Quotzit() {
           <div className="notes-grid">
             {visibleQuotes.map(q=>(
               <StickyNote key={q.id} quote={q}
-                canEdit={q.authorId===user.id}
-                canDelete={q.authorId===user.id}
+                canEdit={q.author_id===user.id}
+                canDelete={q.author_id===user.id}
                 onEdit={setEditQ} onDelete={deleteQuote}/>
             ))}
           </div>
@@ -711,12 +666,11 @@ export default function Quotzit() {
       </div>
 
       {(showAdd||editQ) && (
-        <QuoteForm user={user} groups={groups} initial={editQ||null}
+        <QuoteForm user={user} myTags={myTags} initial={editQ||null}
           onSave={saveQuote} onClose={()=>{setShowAdd(false);setEditQ(null);}}/>
       )}
       {shareTag && (
-        <ShareModal tag={shareTag} userId={user.id} groups={groups}
-          onSave={g=>setGroups(g)} onClose={()=>setShare(null)}/>
+        <ShareModal tag={shareTag} user={user} onClose={()=>setShare(null)}/>
       )}
     </div>
   );
