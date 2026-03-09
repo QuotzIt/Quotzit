@@ -220,13 +220,7 @@ const useSpeech = onResult => {
     const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
     const rec = new SR();
     rec.lang="en-US"; rec.interimResults=false;
-    rec.onresult = e=>{
-  const transcript = Array.from(e.results)
-    .map(r => r[0].transcript)
-    .join(" ")
-    .trim();
-  if (transcript) setTimeout(()=>{ onResult(transcript); setListening(false); }, 100);
-};
+    rec.onresult = e=>{ onResult(e.results[0][0].transcript); setListening(false); };
     rec.onerror = ()=>setListening(false);
     rec.onend   = ()=>setListening(false);
     recRef.current=rec; rec.start(); setListening(true);
@@ -640,7 +634,6 @@ export default function Quotzit() {
         <div className="topbar-right">
           <span className="topbar-greeting">hey, {user.name}</span>
           <button className="btn btn-primary btn-sm" onClick={()=>setShowAdd(true)}>+ Pin Quote</button>
-          {activeTag && <button className="btn btn-ghost btn-sm" onClick={()=>setShare(activeTag)}>Share Wall</button>}
           <button className="btn btn-ghost btn-sm" onClick={logout}>Sign Out</button>
         </div>
       </div>
@@ -650,6 +643,12 @@ export default function Quotzit() {
           <div className="wall-title">
             {activeTag?<><em>#</em>{activeTag}</>:<>The Wall <em>✦</em></>}
           </div>
+          {activeTag && (
+            <button className="btn btn-ghost btn-sm" onClick={()=>setShare(activeTag)}
+              style={{fontSize:"0.82rem",padding:"7px 14px"}}>
+              📤 Share Wall
+            </button>
+          )}
         </div>
         <TagAccordion tags={myTags} activeTag={activeTag} onSelect={setActive}/>
         {loading ? (
