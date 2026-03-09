@@ -220,7 +220,10 @@ const useSpeech = onResult => {
     const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
     const rec = new SR();
     rec.lang="en-US"; rec.interimResults=false;
-    rec.onresult = e=>{ onResult(e.results[0][0].transcript); setListening(false); };
+    rec.onresult = e=>{
+  const transcript = e.results[0][0].transcript;
+  setTimeout(()=>{ onResult(transcript); setListening(false); }, 100);
+};
     rec.onerror = ()=>setListening(false);
     rec.onend   = ()=>setListening(false);
     recRef.current=rec; rec.start(); setListening(true);
