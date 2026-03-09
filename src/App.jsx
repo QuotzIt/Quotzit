@@ -221,8 +221,11 @@ const useSpeech = onResult => {
     const rec = new SR();
     rec.lang="en-US"; rec.interimResults=false;
     rec.onresult = e=>{
-  const transcript = e.results[0][0].transcript;
-  setTimeout(()=>{ onResult(transcript); setListening(false); }, 100);
+  const transcript = Array.from(e.results)
+    .map(r => r[0].transcript)
+    .join(" ")
+    .trim();
+  if (transcript) setTimeout(()=>{ onResult(transcript); setListening(false); }, 100);
 };
     rec.onerror = ()=>setListening(false);
     rec.onend   = ()=>setListening(false);
