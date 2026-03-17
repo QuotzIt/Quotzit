@@ -867,7 +867,7 @@ export default function Quotzit() {
     const { data:own } = await supabase.from("quotes").select("*").eq("author_id", u.id).order("date", {ascending:false});
     q = [...(own||[])];
     if (groupNames.length) {
-      const { data:shared } = await supabase.from("quotes").select("*").in("tag", groupNames).neq("author_id", u.id).order("date", {ascending:false});
+      const { data:shared } = await supabase.from("quotes").select("*").in("tag", groupNames).order("date", {ascending:false});
       q = [...q, ...(shared||[])];
     }
     const seen = new Set();
