@@ -119,7 +119,7 @@ const FontLoader = ({ theme }) => {
         position: sticky; top: 0; z-index: 100;
       }
       .topbar-logo { font-family: var(--font-marker); font-size: 1.8rem; color: var(--logo-color); letter-spacing: 1px; text-shadow: 1px 2px 8px rgba(0,0,0,0.3); cursor: pointer; }
-      .topbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; }
+      .topbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
       .topbar-greeting { font-family: var(--font-ui); font-style: italic; font-size: 0.88rem; color: ${isDark ? "rgba(245,239,224,0.55)" : "rgba(58,42,26,0.6)"}; white-space: nowrap; }
 
       .btn { font-family: var(--font-ui); font-size: 0.85rem; font-weight: 700; letter-spacing: 0.03em; border: none; cursor: pointer; border-radius: 3px; padding: 8px 16px; transition: transform 0.12s, opacity 0.12s; }
@@ -945,13 +945,11 @@ export default function Quotzit() {
             <div className="wall-title">
               {activeTag ? <><em>#</em>{activeTag}</> : <>The Wall <em>✦</em></>}
             </div>
-            <button
+            <button className="btn btn-ghost btn-sm"
               onClick={()=>{ activeTag ? setShare(activeTag) : setShowGroupPicker(true); }}
-              title="Share"
-              style={{background:"none",border:"none",cursor:"pointer",fontSize:"1.2rem",opacity:0.6,padding:"2px 4px",lineHeight:1,transition:"opacity 0.15s"}}
-              onMouseEnter={e=>e.target.style.opacity=1}
-              onMouseLeave={e=>e.target.style.opacity=0.6}
-            >📤</button>
+              style={{WebkitTapHighlightColor:"transparent"}}>
+              Share
+            </button>
           </div>
         </div>
 
