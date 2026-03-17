@@ -217,7 +217,7 @@ const FontLoader = ({ theme }) => {
       .sticky-tag { display:inline-block; margin-top:8px; font-family:var(--font-ui); font-size:0.66rem; font-weight:700; letter-spacing:0.06em; text-transform:lowercase; background:rgba(0,0,0,0.1); border-radius:10px; padding:2px 9px; }
 
       /* ── MODAL ── */
-      .overlay { position:fixed; inset:0; background:rgba(0,0,0,0.58); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; z-index:200; animation:fadeIn 0.15s ease; padding:16px; }
+      .overlay { position:fixed; inset:0; background:rgba(0,0,0,0.58); backdrop-filter:blur(4px); display:flex; align-items:flex-start; justify-content:center; z-index:200; animation:fadeIn 0.15s ease; padding:60px 16px 16px; overflow-y:auto; }
       @keyframes fadeIn{from{opacity:0}to{opacity:1}}
       .modal { background:#fffdf5; width:460px; max-width:100%; max-height:90vh; overflow-y:auto; border-radius:2px; padding:36px 30px 28px; box-shadow:6px 9px 36px rgba(0,0,0,0.45); position:relative; animation:slideUp 0.22s cubic-bezier(0.34,1.4,0.64,1) both; }
       @keyframes slideUp{from{transform:translateY(28px);opacity:0}to{transform:translateY(0);opacity:1}}
