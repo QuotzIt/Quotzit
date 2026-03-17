@@ -853,6 +853,9 @@ export default function Quotzit() {
   const [showSettings,setShowSettings]=useState(false);
   const [loading,    setLoading]   = useState(false);
   const [theme,      setTheme]     = useState(ThemeStore.get);
+  const [groupCovers,setGroupCovers]=useState({});
+  const [isGroupOwner,setIsGroupOwner]=useState(false);
+  const coverFileRef = useRef(null);
 
   const handleThemeChange = t => { setTheme(t); ThemeStore.set(t); };
 
@@ -875,7 +878,42 @@ export default function Quotzit() {
     setLoading(false);
   };
 
-  useEffect(() => { if (user) loadQuotes(user); }, [user]);
+  useEffect(() => { if (user) { loadQuotes(user); loadGroupCovers(user); } }, [user]);
+
+  const loadGroupCovers = async (u) => {
+    const { data:groups } = await supabase.from("groups").select("name,cover_url,owner_id");
+    if (!groups) return;
+    const covers = {};
+    groups.forEach(g => { if (g.cover_url) covers[g.name] = g.cover_url; });
+    setGroupCovers(covers);
+  };
+
+  // check if current user owns the active tag group
+  useEffect(() => {
+    const check = async () => {
+      if (!activeTag || !user) { setIsGroupOwner(false); return; }
+      const { data } = await supabase.from("groups").select("id").eq("name", activeTag).eq("owner_id", user.id).single();
+      setIsGroupOwner(!!data);
+    };
+    check();
+  }, [activeTag, user]);
+
+  const uploadCoverPhoto = async (file) => {
+    if (!file || !activeTag) return;
+    const ext = file.name.split(".").pop();
+    const path = `${user.id}/${activeTag.replace(/\s+/g,"-")}-${Date.now()}.${ext}`;
+    const { error:upErr } = await supabase.storage.from("group-covers").upload(path, file, { upsert: true });
+    if (upErr) return alert("Upload failed. Please try again.");
+    const { data:urlData } = supabase.storage.from("group-covers").getPublicUrl(path);
+    const url = urlData.publicUrl;
+    await supabase.from("groups").update({ cover_url: url }).eq("name", activeTag).eq("owner_id", user.id);
+    setGroupCovers(prev => ({ ...prev, [activeTag]: url }));
+  };
+
+  const removeCoverPhoto = async () => {
+    await supabase.from("groups").update({ cover_url: null }).eq("name", activeTag).eq("owner_id", user.id);
+    setGroupCovers(prev => { const n = {...prev}; delete n[activeTag]; return n; });
+  };
 
   // clear wall param from URL after using it
   useEffect(() => {
@@ -935,9 +973,12 @@ export default function Quotzit() {
   if (screen === "login")   return <AuthScreen initialMode="login"  onAuth={handleAuth} onBack={()=>setScreen("landing")}/>;
   if (screen === "signup")  return <AuthScreen initialMode="signup" onAuth={handleAuth} onBack={()=>setScreen("landing")}/>;
 
+  const activeCover = activeTag ? groupCovers[activeTag] : null;
+  const effectiveTheme = activeCover ? { ...theme, bg: activeCover } : theme;
+
   return (
-    <div className={`app-wrapper ${theme.bg?"has-bg":""}`}>
-      <FontLoader theme={theme}/>
+    <div className={`app-wrapper ${(effectiveTheme.bg)?"has-bg":""}`}>
+      <FontLoader theme={effectiveTheme}/>
 
       <div className="topbar">
         <div className="topbar-logo" onClick={()=>{setActive(null);clearFilters();}}>Quotzit</div>
@@ -956,10 +997,27 @@ export default function Quotzit() {
               {activeTag ? <><em>#</em>{activeTag}</> : <>The Wall <em>✦</em></>}
             </div>
             <button className="btn btn-ghost btn-sm"
-              onClick={()=>{ activeTag ? setShare(activeTag) : setShowGroupPicker(true); }}
-              style={{WebkitTapHighlightColor:"transparent"}}>
+              onClick={()=>{ activeTag ? setShare(activeTag) : setShowGroupPicker(true); }}>
               Share
             </button>
+            {activeTag && isGroupOwner && (
+              <>
+                <button className="btn btn-ghost btn-sm"
+                  onClick={()=>coverFileRef.current?.click()}
+                  style={{fontSize:"0.75rem"}}>
+                  {activeCover ? "📷 Change Cover" : "📷 Set Cover"}
+                </button>
+                {activeCover && (
+                  <button className="btn btn-ghost btn-sm"
+                    onClick={removeCoverPhoto}
+                    style={{fontSize:"0.75rem",color:"#f87171",borderColor:"#f87171"}}>
+                    Remove Cover
+                  </button>
+                )}
+                <input ref={coverFileRef} type="file" accept="image/*" style={{display:"none"}}
+                  onChange={e=>{ if(e.target.files[0]) uploadCoverPhoto(e.target.files[0]); }}/>
+              </>
+            )}
           </div>
         </div>
 
