@@ -1,5 +1,9 @@
 // Quotzit v3.0 — invite flow, settings, filters, search, landing page, themes
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+
+// 25002500 Portal 2014 renders modals directly on body so iOS fixed positioning works 2500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500
+const Portal = ({ children }) => createPortal(children, document.body);
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = "https://uxpdancjavdtkasvxskf.supabase.co";
@@ -217,7 +221,7 @@ const FontLoader = ({ theme }) => {
       .sticky-tag { display:inline-block; margin-top:8px; font-family:var(--font-ui); font-size:0.66rem; font-weight:700; letter-spacing:0.06em; text-transform:lowercase; background:rgba(0,0,0,0.1); border-radius:10px; padding:2px 9px; }
 
       /* ── MODAL ── */
-      .overlay { position:fixed; inset:0; background:rgba(0,0,0,0.58); backdrop-filter:blur(4px); display:flex; align-items:flex-start; justify-content:center; z-index:200; animation:fadeIn 0.15s ease; padding:60px 16px 16px; overflow-y:auto; }
+      .overlay { position:fixed; inset:0; background:rgba(0,0,0,0.65); display:flex; align-items:flex-start; justify-content:center; z-index:9999; animation:fadeIn 0.15s ease; padding:60px 16px 40px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
       @keyframes fadeIn{from{opacity:0}to{opacity:1}}
       .modal { background:#fffdf5; width:460px; max-width:100%; max-height:90vh; overflow-y:auto; border-radius:2px; padding:36px 30px 28px; box-shadow:6px 9px 36px rgba(0,0,0,0.45); position:relative; animation:slideUp 0.22s cubic-bezier(0.34,1.4,0.64,1) both; }
       @keyframes slideUp{from{transform:translateY(28px);opacity:0}to{transform:translateY(0);opacity:1}}
@@ -413,6 +417,7 @@ const QuoteForm = ({ user, myTags, initial, onSave, onClose }) => {
   const selStyle = { width:"100%", fontFamily:"var(--font-hand)", fontSize:"1rem", padding:"9px 12px", border:"1.5px solid #d4c4a8", borderRadius:2, background:"#fffdf5", color:"var(--ink)", outline:"none" };
 
   return (
+    <Portal>
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal">
         <button className="modal-close" onClick={onClose}>✕</button>
@@ -474,6 +479,7 @@ const QuoteForm = ({ user, myTags, initial, onSave, onClose }) => {
         </div>
       </div>
     </div>
+    </Portal>
   );
 };
 
@@ -527,6 +533,7 @@ const ShareModal = ({ tag, user, onClose }) => {
   const copy = () => navigator.clipboard.writeText(inviteUrl).then(() => { setCopied(true); setTimeout(()=>setCopied(false), 2200); });
 
   return (
+    <Portal>
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal">
         <button className="modal-close" onClick={onClose}>✕</button>
@@ -571,6 +578,7 @@ const ShareModal = ({ tag, user, onClose }) => {
         </div>
       </div>
     </div>
+    </Portal>
   );
 };
 
@@ -630,6 +638,7 @@ const SettingsModal = ({ user, theme, onThemeChange, onUserUpdate, onDeleteAccou
   const clearBg = () => onThemeChange({ ...theme, bg: null });
 
   return (
+    <Portal>
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal" style={{maxWidth:500}}>
         <button className="modal-close" onClick={onClose}>✕</button>
@@ -710,6 +719,7 @@ const SettingsModal = ({ user, theme, onThemeChange, onUserUpdate, onDeleteAccou
         </div>
       </div>
     </div>
+    </Portal>
   );
 };
 
@@ -1013,6 +1023,7 @@ export default function Quotzit() {
       )}
       {shareTag && <ShareModal tag={shareTag} user={user} onClose={()=>setShare(null)}/>}
       {showGroupPicker && (
+        <Portal>
         <div className="overlay" onClick={e=>e.target===e.currentTarget&&setShowGroupPicker(false)}>
           <div className="modal" style={{maxWidth:340}}>
             <button className="modal-close" onClick={()=>setShowGroupPicker(false)}>✕</button>
@@ -1033,6 +1044,7 @@ export default function Quotzit() {
             )}
           </div>
         </div>
+        </Portal>
       )}
       {showSettings && (
         <SettingsModal user={user} theme={theme}
