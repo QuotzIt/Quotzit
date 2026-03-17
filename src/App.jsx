@@ -839,6 +839,7 @@ export default function Quotzit() {
   const [showAdd,    setShowAdd]   = useState(false);
   const [editQ,      setEditQ]     = useState(null);
   const [shareTag,   setShare]     = useState(null);
+  const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [showSettings,setShowSettings]=useState(false);
   const [loading,    setLoading]   = useState(false);
   const [theme,      setTheme]     = useState(ThemeStore.get);
@@ -940,12 +941,18 @@ export default function Quotzit() {
 
       <div className="wall-area">
         <div className="wall-header">
-          <div className="wall-title">
-            {activeTag ? <><em>#</em>{activeTag}</> : <>The Wall <em>✦</em></>}
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div className="wall-title">
+              {activeTag ? <><em>#</em>{activeTag}</> : <>The Wall <em>✦</em></>}
+            </div>
+            <button
+              onClick={()=>{ activeTag ? setShare(activeTag) : setShowGroupPicker(true); }}
+              title="Share"
+              style={{background:"none",border:"none",cursor:"pointer",fontSize:"1.2rem",opacity:0.6,padding:"2px 4px",lineHeight:1,transition:"opacity 0.15s"}}
+              onMouseEnter={e=>e.target.style.opacity=1}
+              onMouseLeave={e=>e.target.style.opacity=0.6}
+            >📤</button>
           </div>
-          {activeTag && (
-            <button className="btn btn-ghost btn-sm" onClick={()=>setShare(activeTag)}>📤 Share Wall</button>
-          )}
         </div>
 
         {/* Search */}
@@ -1007,6 +1014,28 @@ export default function Quotzit() {
           onSave={saveQuote} onClose={()=>{setShowAdd(false);setEditQ(null);}}/>
       )}
       {shareTag && <ShareModal tag={shareTag} user={user} onClose={()=>setShare(null)}/>}
+      {showGroupPicker && (
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setShowGroupPicker(false)}>
+          <div className="modal" style={{maxWidth:340}}>
+            <button className="modal-close" onClick={()=>setShowGroupPicker(false)}>✕</button>
+            <div className="modal-title" style={{marginBottom:16}}>Which wall?</div>
+            {myTags.length === 0 ? (
+              <div style={{fontFamily:"var(--font-ui)",fontSize:"0.9rem",color:"#aaa",fontStyle:"italic",textAlign:"center",padding:"20px 0"}}>
+                No groups yet — tag a quote to create one!
+              </div>
+            ) : (
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {myTags.map(t=>(
+                  <button key={t} className="btn btn-ghost" style={{textAlign:"left",justifyContent:"flex-start",color:"var(--ink)",background:"#faf7f2",border:"1.5px solid #e8dfc8",fontFamily:"var(--font-ui)",fontSize:"0.92rem"}}
+                    onClick={()=>{ setShowGroupPicker(false); setShare(t); }}>
+                    #{t}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {showSettings && (
         <SettingsModal user={user} theme={theme}
           onThemeChange={handleThemeChange}
