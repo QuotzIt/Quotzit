@@ -32,6 +32,8 @@ const COLOR_OPTIONS = [
   { value:"note-white",  hex:"#fafafa" },
 ];
 
+const REACTION_EMOJIS = ["❤️","😂","😮","👏","😢"];
+
 // ── Session ───────────────────────────────────────────────────────────────────
 const Session = {
   get:   () => { try { return JSON.parse(sessionStorage.getItem("qz_user")); } catch { return null; } },
@@ -220,6 +222,13 @@ const FontLoader = ({ theme }) => {
       .meta-row { display:flex; align-items:center; gap:5px; }
       .sticky-tag { display:inline-block; margin-top:8px; font-family:var(--font-ui); font-size:0.66rem; font-weight:700; letter-spacing:0.06em; text-transform:lowercase; background:rgba(0,0,0,0.1); border-radius:10px; padding:2px 9px; }
 
+      /* ── REACTIONS ── */
+      .reaction-row { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+      .reaction-chip { background:rgba(0,0,0,0.08); border:1.5px solid transparent; border-radius:14px; padding:3px 9px; font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all 0.12s; }
+      .reaction-chip:hover { background:rgba(0,0,0,0.16); }
+      .reaction-chip.active { background:var(--note-yellow); border-color:#b8930a; }
+      .reaction-count { font-family:var(--font-ui); font-size:0.68rem; font-weight:700; color:#555; }
+
       /* ── MODAL ── */
       .overlay { position:fixed; inset:0; background:rgba(0,0,0,0.65); display:flex; align-items:flex-start; justify-content:center; z-index:9999; animation:fadeIn 0.15s ease; padding:60px 16px 40px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
       @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -315,21 +324,23 @@ const AuthScreen = ({ initialMode="login", joinInfo, onAuth, onBack }) => {
         if (existing) { setErr("That email is already registered."); setLoading(false); return; }
         const { data, error } = await supabase.from("users").insert([{ name, email: email.toLowerCase(), pass }]).select().single();
         if (error) throw error;
-        if (joinInfo) await joinGroup(data.id, joinInfo.groupId);
-        Session.set(data); onAuth(data, joinInfo?.groupName);
+        const { data:wall } = await supabase.from("walls").insert([{ name: "My Wall", owner_id: data.id }]).select().single();
+        if (wall) await supabase.from("wall_members").insert([{ wall_id: wall.id, user_id: data.id }]);
+        if (joinInfo) await joinWall(data.id, joinInfo.wallId);
+        Session.set(data); onAuth(data, joinInfo?.wallId);
       } else {
         const { data, error } = await supabase.from("users").select("*").eq("email", email.toLowerCase()).eq("pass", pass).single();
         if (error || !data) { setErr("Email or password is incorrect."); setLoading(false); return; }
-        if (joinInfo) await joinGroup(data.id, joinInfo.groupId);
-        Session.set(data); onAuth(data, joinInfo?.groupName);
+        if (joinInfo) await joinWall(data.id, joinInfo.wallId);
+        Session.set(data); onAuth(data, joinInfo?.wallId);
       }
     } catch(e) { setErr("Something went wrong. Please try again."); }
     setLoading(false);
   };
 
-  const joinGroup = async (userId, groupId) => {
-    const { data:already } = await supabase.from("group_members").select("user_id").eq("group_id", groupId).eq("user_id", userId).single();
-    if (!already) await supabase.from("group_members").insert([{ group_id: groupId, user_id: userId }]);
+  const joinWall = async (userId, wallId) => {
+    const { data:already } = await supabase.from("wall_members").select("user_id").eq("wall_id", wallId).eq("user_id", userId).single();
+    if (!already) await supabase.from("wall_members").insert([{ wall_id: wallId, user_id: userId }]);
   };
 
   return (
@@ -339,7 +350,7 @@ const AuthScreen = ({ initialMode="login", joinInfo, onAuth, onBack }) => {
         {onBack && <button className="btn-cancel" style={{marginBottom:12,fontSize:"0.78rem"}} onClick={onBack}>← back</button>}
         <div className="auth-title">Quotzit</div>
         <div className="auth-sub">{mode==="login" ? "welcome back ✦" : "save the good stuff ✦"}</div>
-        {joinInfo && <div className="auth-info">You've been invited to <strong>#{joinInfo.groupName}</strong> — {mode==="signup"?"create an account to join!":"sign in to join!"}</div>}
+        {joinInfo && <div className="auth-info">You've been invited to <strong>{joinInfo.wallName}</strong> — {mode==="signup"?"create an account to join!":"sign in to join!"}</div>}
         {err && <div className="auth-error">{err}</div>}
         {mode === "signup" && (
           <div className="field"><label>your name</label>
@@ -368,7 +379,7 @@ const AuthScreen = ({ initialMode="login", joinInfo, onAuth, onBack }) => {
 };
 
 // ── Quote Form ────────────────────────────────────────────────────────────────
-const QuoteForm = ({ user, myTags, initial, onSave, onClose }) => {
+const QuoteForm = ({ user, myWalls, initial, onSave, onNewWall, onClose }) => {
   const now = new Date();
   const toLocalDate = d => new Date(d).toLocaleDateString("en-CA");
   const toLocalTime = d => new Date(d).toTimeString().slice(0,5);
@@ -376,8 +387,8 @@ const QuoteForm = ({ user, myTags, initial, onSave, onClose }) => {
   const [text,    setText]   = useState(initial?.text    ?? "");
   const [saidBy,  setSaidBy] = useState(initial?.said_by ?? "");
   const [loc,     setLoc]    = useState(initial?.location ?? "");
-  const [tag,     setTag]    = useState(initial?.tag      ?? "");
-  const [newTag,  setNewTag] = useState("");
+  const [wallId,  setWallId] = useState(initial?.wall_id ?? myWalls[0]?.id ?? "");
+  const [newWallName, setNewWallName] = useState("");
   const [showNew, setShowNew]= useState(false);
   const [date,    setDate]   = useState(initial ? toLocalDate(initial.date) : toLocalDate(now));
   const [time,    setTime]   = useState(initial ? toLocalTime(initial.date) : toLocalTime(now));
@@ -390,10 +401,19 @@ const QuoteForm = ({ user, myTags, initial, onSave, onClose }) => {
   const save = async () => {
     if (!text.trim()) return;
     setSaving(true);
-    const finalTag = showNew ? newTag.trim() : tag;
+    let finalWallId = wallId;
+    if (showNew) {
+      const name = newWallName.trim();
+      if (!name) { setSaving(false); return; }
+      const { data:wall, error:wallErr } = await supabase.from("walls").insert([{ name, owner_id: user.id }]).select().single();
+      if (wallErr || !wall) { setSaving(false); return; }
+      await supabase.from("wall_members").insert([{ wall_id: wall.id, user_id: user.id }]);
+      finalWallId = wall.id;
+      onNewWall(wall);
+    }
     const record = {
       text: text.trim(), said_by: saidBy.trim(), location: loc.trim(),
-      tag: finalTag || null, date: new Date(`${date}T${time}`).toISOString(),
+      wall_id: finalWallId || null, date: new Date(`${date}T${time}`).toISOString(),
       author_id: user.id, author_name: user.name,
       color, font, rotation: initial?.rotation ?? rand(ROTATIONS),
     };
@@ -403,13 +423,6 @@ const QuoteForm = ({ user, myTags, initial, onSave, onClose }) => {
     } else {
       const { data, error } = await supabase.from("quotes").insert([record]).select().single();
       if (!error) onSave(data);
-      if (finalTag) {
-        const { data:existing } = await supabase.from("groups").select("id").eq("name", finalTag).eq("owner_id", user.id).single();
-        if (!existing) {
-          const { data:grp } = await supabase.from("groups").insert([{ name: finalTag, owner_id: user.id }]).select().single();
-          if (grp) await supabase.from("group_members").insert([{ group_id: grp.id, user_id: user.id }]);
-        }
-      }
     }
     setSaving(false); onClose();
   };
@@ -459,17 +472,16 @@ const QuoteForm = ({ user, myTags, initial, onSave, onClose }) => {
           </div>
         </div>
         <div className="field">
-          <label>tag <span style={{textTransform:"none",fontWeight:400,fontSize:"0.72rem",color:"#bbb",letterSpacing:0}}>(optional)</span></label>
+          <label>wall</label>
           {!showNew ? (
-            <select value={tag} onChange={e=>{ if(e.target.value==="__new__"){setShowNew(true);setTag("");}else setTag(e.target.value); }} style={selStyle}>
-              <option value="">— no tag —</option>
-              {myTags.map(t=><option key={t} value={t}>{t}</option>)}
-              <option value="__new__">+ create new tag</option>
+            <select value={wallId} onChange={e=>{ if(e.target.value==="__new__"){setShowNew(true);}else setWallId(e.target.value); }} style={selStyle}>
+              {myWalls.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
+              <option value="__new__">+ create new wall</option>
             </select>
           ) : (
             <>
-              <input value={newTag} onChange={e=>setNewTag(e.target.value)} placeholder="e.g. girls weekend" style={{...selStyle,marginBottom:4}} />
-              <span style={{fontFamily:"var(--font-ui)",fontSize:"0.75rem",color:"#999",cursor:"pointer",textDecoration:"underline"}} onClick={()=>{setShowNew(false);setNewTag("");}}>← back to existing tags</span>
+              <input value={newWallName} onChange={e=>setNewWallName(e.target.value)} placeholder="e.g. girls weekend" style={{...selStyle,marginBottom:4}} />
+              <span style={{fontFamily:"var(--font-ui)",fontSize:"0.75rem",color:"#999",cursor:"pointer",textDecoration:"underline"}} onClick={()=>{setShowNew(false);setNewWallName("");}}>← back to existing walls</span>
             </>
           )}
         </div>
@@ -484,64 +496,74 @@ const QuoteForm = ({ user, myTags, initial, onSave, onClose }) => {
 };
 
 // ── Share Modal ───────────────────────────────────────────────────────────────
-const ShareModal = ({ tag, user, onClose }) => {
+const genToken = () => Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+
+const ShareModal = ({ wall, user, onWallUpdate, onClose }) => {
   const [email,   setEmail]  = useState("");
   const [copied,  setCopied] = useState(false);
   const [members, setMembers]= useState([]);
-  const [grpId,   setGrpId]  = useState(null);
   const [inviteToken, setInviteToken] = useState("");
+  const [visibility, setVisibility] = useState(wall.visibility);
+  const [shareToken, setShareToken] = useState(wall.share_token || "");
+  const isOwner = wall.owner_id === user.id;
 
   useEffect(() => {
     const load = async () => {
-      const { data:grp } = await supabase.from("groups").select("id").eq("name", tag).eq("owner_id", user.id).single();
-      if (!grp) return;
-      setGrpId(grp.id);
-      // get or create invite token
-      const { data:existing } = await supabase.from("invite_tokens").select("token").eq("group_id", grp.id).single();
+      const { data:existing } = await supabase.from("invite_tokens").select("token").eq("wall_id", wall.id).single();
       if (existing) {
         setInviteToken(existing.token);
       } else {
-        const token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-        await supabase.from("invite_tokens").insert([{ token, group_id: grp.id }]);
+        const token = genToken();
+        await supabase.from("invite_tokens").insert([{ token, wall_id: wall.id }]);
         setInviteToken(token);
       }
-      const { data:mems } = await supabase.from("group_members").select("user_id, users(id,name,email)").eq("group_id", grp.id);
+      const { data:mems } = await supabase.from("wall_members").select("user_id, users(id,name,email)").eq("wall_id", wall.id);
       setMembers(mems || []);
     };
     load();
-  }, [tag, user.id]);
+  }, [wall.id]);
 
   const inviteUrl = inviteToken ? `${window.location.origin}?invite=${inviteToken}` : "";
-  const smsBody   = encodeURIComponent(`Psst! Don't forget what we said! Join ${tag} on Quotzit! ${inviteUrl}`);
+  const publicUrl = shareToken ? `${window.location.origin}?w=${shareToken}` : "";
+  const smsBody   = encodeURIComponent(`Psst! Don't forget what we said! Join ${wall.name} on Quotzit! ${inviteUrl}`);
 
   const addByEmail = async () => {
-    if (!email.trim() || !grpId) return;
+    if (!email.trim()) return;
     const { data:invitee } = await supabase.from("users").select("*").eq("email", email.trim().toLowerCase()).single();
     if (!invitee) return alert("No Quotzit account found with that email. Send them the invite text to sign up first!");
-    const { error } = await supabase.from("group_members").insert([{ group_id: grpId, user_id: invitee.id }]);
-    if (error) return alert("They may already be in this group.");
+    const { error } = await supabase.from("wall_members").insert([{ wall_id: wall.id, user_id: invitee.id }]);
+    if (error) return alert("They may already be on this wall.");
     setMembers(prev => [...prev, { user_id: invitee.id, users: invitee }]);
     setEmail("");
   };
 
   const removeMember = async (memberId) => {
-    if (memberId === user.id) return alert("You can't remove yourself as the owner.");
-    await supabase.from("group_members").delete().eq("group_id", grpId).eq("user_id", memberId);
+    if (memberId === wall.owner_id) return alert("You can't remove the wall's owner.");
+    await supabase.from("wall_members").delete().eq("wall_id", wall.id).eq("user_id", memberId);
     setMembers(prev => prev.filter(m => m.user_id !== memberId));
   };
 
-  const copy = () => navigator.clipboard.writeText(inviteUrl).then(() => { setCopied(true); setTimeout(()=>setCopied(false), 2200); });
+  const togglePublic = async () => {
+    const nextVis = visibility === "private" ? "public_unlisted" : "private";
+    const token = (nextVis === "public_unlisted" && !shareToken) ? genToken() : shareToken;
+    const { data, error } = await supabase.from("walls").update({ visibility: nextVis, share_token: token }).eq("id", wall.id).select().single();
+    if (error) return alert("Couldn't update visibility. Try again.");
+    setVisibility(data.visibility); setShareToken(data.share_token || "");
+    onWallUpdate(data);
+  };
+
+  const copy = (url) => navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(()=>setCopied(false), 2200); });
 
   return (
     <Portal>
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal">
         <button className="modal-close" onClick={onClose}>✕</button>
-        <div className="modal-title">Share "{tag}"</div>
+        <div className="modal-title">Share "{wall.name}"</div>
         <div style={{background:"#fef9e7",border:"1.5px solid #f0d060",borderRadius:3,padding:"14px 16px",marginBottom:18}}>
           <div className="section-label" style={{marginTop:0}}>invite by text</div>
           <div style={{fontFamily:"var(--font-hand)",fontSize:"1rem",color:"var(--ink)",fontStyle:"italic",marginBottom:12}}>
-            "Psst! Don't forget what we said! Join {tag} on Quotzit!"
+            "Psst! Don't forget what we said! Join {wall.name} on Quotzit!"
           </div>
           <a href={`sms:?&body=${smsBody}`} style={{textDecoration:"none"}}>
             <button className="btn btn-primary" style={{width:"100%"}}>📱 Send Invite Text</button>
@@ -559,7 +581,7 @@ const ShareModal = ({ tag, user, onClose }) => {
         {members.map((m,i) => (
           <div key={i} className="invite-item">
             <span>{m.users?.name} <span style={{color:"#bbb",fontSize:"0.75rem"}}>({m.users?.email})</span></span>
-            {m.user_id !== user.id && (
+            {m.user_id !== wall.owner_id && isOwner && (
               <button onClick={()=>removeMember(m.user_id)}
                 style={{background:"none",border:"none",cursor:"pointer",color:"#dc2626",fontSize:"0.75rem",fontFamily:"var(--font-ui)"}}>
                 remove
@@ -568,11 +590,33 @@ const ShareModal = ({ tag, user, onClose }) => {
           </div>
         ))}
         <hr className="divider"/>
-        <div className="section-label">invite link</div>
+        <div className="section-label">invite link (join as a member)</div>
         <div className="share-link-box">{inviteUrl || "generating…"}</div>
-        <button className="btn btn-sm" style={{background:"none",border:"1.5px solid #ccc",color:"#777",fontFamily:"var(--font-ui)",cursor:"pointer"}} onClick={copy}>
+        <button className="btn btn-sm" style={{background:"none",border:"1.5px solid #ccc",color:"#777",fontFamily:"var(--font-ui)",cursor:"pointer"}} onClick={()=>copy(inviteUrl)}>
           {copied ? "✓ Copied!" : "Copy Link"}
         </button>
+
+        {isOwner && (
+          <>
+            <hr className="divider"/>
+            <div className="section-label">public viewing</div>
+            <button className="btn btn-sm" style={{background: visibility==="public_unlisted" ? "var(--note-yellow)" : "none", border:"1.5px solid #ccc", fontFamily:"var(--font-ui)", cursor:"pointer", marginBottom:10}} onClick={togglePublic}>
+              {visibility==="public_unlisted" ? "✓ Public (view-only)" : "Make Public (view-only)"}
+            </button>
+            {visibility === "public_unlisted" && (
+              <>
+                <div style={{fontFamily:"var(--font-ui)",fontSize:"0.72rem",color:"#999",marginBottom:6}}>
+                  Anyone with this link can view — even without a Quotzit account. They can't post or join, and reacting needs an account. Never searchable.
+                </div>
+                <div className="share-link-box">{publicUrl}</div>
+                <button className="btn btn-sm" style={{background:"none",border:"1.5px solid #ccc",color:"#777",fontFamily:"var(--font-ui)",cursor:"pointer"}} onClick={()=>copy(publicUrl)}>
+                  {copied ? "✓ Copied!" : "Copy Link"}
+                </button>
+              </>
+            )}
+          </>
+        )}
+
         <div className="modal-actions" style={{marginTop:16}}>
           <button className="btn btn-primary" onClick={onClose}>Done</button>
         </div>
@@ -588,20 +632,20 @@ const SettingsModal = ({ user, theme, onThemeChange, onUserUpdate, onDeleteAccou
   const [email,    setEmail]   = useState(user.email);
   const [pass,     setPass]    = useState("");
   const [newPass,  setNewPass] = useState("");
-  const [groups,   setGroups]  = useState([]);
+  const [walls,    setWalls]   = useState([]);
   const [saving,   setSaving]  = useState(false);
   const [msg,      setMsg]     = useState("");
   const fileRef = useRef(null);
 
   useEffect(() => {
     const load = async () => {
-      const { data:owned } = await supabase.from("groups").select("id,name").eq("owner_id", user.id);
+      const { data:owned } = await supabase.from("walls").select("id,name").eq("owner_id", user.id);
       const results = [];
-      for (const g of (owned||[])) {
-        const { data:mems } = await supabase.from("group_members").select("user_id, users(id,name,email)").eq("group_id", g.id);
-        results.push({ ...g, members: mems||[] });
+      for (const w of (owned||[])) {
+        const { data:mems } = await supabase.from("wall_members").select("user_id, users(id,name,email)").eq("wall_id", w.id);
+        results.push({ ...w, members: mems||[] });
       }
-      setGroups(results);
+      setWalls(results);
     };
     load();
   }, [user.id]);
@@ -622,9 +666,9 @@ const SettingsModal = ({ user, theme, onThemeChange, onUserUpdate, onDeleteAccou
     setSaving(false);
   };
 
-  const removeMember = async (groupId, memberId) => {
-    await supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", memberId);
-    setGroups(prev => prev.map(g => g.id===groupId ? {...g, members: g.members.filter(m=>m.user_id!==memberId)} : g));
+  const removeMember = async (wallId, memberId) => {
+    await supabase.from("wall_members").delete().eq("wall_id", wallId).eq("user_id", memberId);
+    setWalls(prev => prev.map(w => w.id===wallId ? {...w, members: w.members.filter(m=>m.user_id!==memberId)} : w));
   };
 
   const handleBgUpload = e => {
@@ -690,16 +734,16 @@ const SettingsModal = ({ user, theme, onThemeChange, onUserUpdate, onDeleteAccou
 
         <hr className="divider"/>
         <div className="settings-section">
-          <h3>Your Groups</h3>
-          {groups.length === 0 && <div style={{fontFamily:"var(--font-ui)",fontSize:"0.85rem",color:"#aaa",fontStyle:"italic"}}>No groups yet — create a tag on a quote to start one.</div>}
-          {groups.map(g => (
-            <div key={g.id} className="group-card">
-              <div className="group-card-title">#{g.name}</div>
-              {g.members.map((m,i) => (
+          <h3>Your Walls</h3>
+          {walls.length === 0 && <div style={{fontFamily:"var(--font-ui)",fontSize:"0.85rem",color:"#aaa",fontStyle:"italic"}}>No walls yet — pin a quote to a new wall to start one.</div>}
+          {walls.map(w => (
+            <div key={w.id} className="group-card">
+              <div className="group-card-title">{w.name}</div>
+              {w.members.map((m,i) => (
                 <div key={i} className="invite-item">
                   <span>{m.users?.name} <span style={{color:"#bbb",fontSize:"0.72rem"}}>({m.users?.email})</span></span>
                   {m.user_id !== user.id && (
-                    <button onClick={()=>removeMember(g.id, m.user_id)}
+                    <button onClick={()=>removeMember(w.id, m.user_id)}
                       style={{background:"none",border:"none",cursor:"pointer",color:"#dc2626",fontSize:"0.75rem",fontFamily:"var(--font-ui)"}}>
                       remove
                     </button>
@@ -724,9 +768,10 @@ const SettingsModal = ({ user, theme, onThemeChange, onUserUpdate, onDeleteAccou
 };
 
 // ── Sticky Note ───────────────────────────────────────────────────────────────
-const StickyNote = ({ quote, canEdit, canDelete, onEdit, onDelete }) => {
+const StickyNote = ({ quote, wallName, canEdit, canDelete, reactions, onToggleReaction, onEdit, onDelete }) => {
   const [open, setOpen] = useState(false);
   const fontCss = FONT_MAP[quote.font] || "var(--font-hand)";
+  const reactionMap = Object.fromEntries((reactions||[]).map(r=>[r.emoji,r]));
 
   return (
     <div className={`sticky ${quote.color||"note-yellow"}`}
@@ -746,32 +791,99 @@ const StickyNote = ({ quote, canEdit, canDelete, onEdit, onDelete }) => {
           {quote.location && <div className="meta-row">📍 {quote.location}</div>}
           <div className="meta-row">📅 {fmtDate(quote.date)} at {fmtTime(quote.date)}</div>
           {quote.author_name && <div className="meta-row" style={{color:"#999",fontSize:"0.68rem"}}>added by {quote.author_name}</div>}
-          {quote.tag && <div><div className="sticky-tag">#{quote.tag}</div></div>}
+          {wallName && <div><div className="sticky-tag">{wallName}</div></div>}
         </div>
       )}
-      {!open && quote.tag && <div className="sticky-tag">#{quote.tag}</div>}
+      {!open && wallName && <div className="sticky-tag">{wallName}</div>}
+      {onToggleReaction && (
+        <div className="reaction-row">
+          {REACTION_EMOJIS.map(e => {
+            const r = reactionMap[e];
+            return (
+              <button key={e} className={`reaction-chip ${r?.reacted?"active":""}`} onClick={()=>onToggleReaction(quote.id, e)}>
+                {e}{r?.count ? <span className="reaction-count">{r.count}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
 
-// ── Read-Only Wall ────────────────────────────────────────────────────────────
-const ReadOnlyWall = ({ shareParam }) => {
-  const [quotes, setQuotes] = useState([]);
-  const [tag,    setTag]    = useState("");
+// ── Public Wall (view-only, no account required) ───────────────────────────────
+const loadReactionMap = async (quoteIds, viewerId) => {
+  if (!quoteIds.length) return {};
+  const { data } = await supabase.from("reactions").select("*").in("quote_id", quoteIds);
+  const map = {};
+  (data||[]).forEach(r => {
+    if (!map[r.quote_id]) map[r.quote_id] = {};
+    if (!map[r.quote_id][r.emoji]) map[r.quote_id][r.emoji] = { emoji:r.emoji, count:0, reacted:false };
+    map[r.quote_id][r.emoji].count++;
+    if (r.user_id === viewerId) map[r.quote_id][r.emoji].reacted = true;
+  });
+  const out = {};
+  Object.entries(map).forEach(([qid, byEmoji]) => { out[qid] = Object.values(byEmoji); });
+  return out;
+};
+
+const PublicWall = ({ shareToken }) => {
+  const [wall,     setWall]    = useState(null);
+  const [quotes,   setQuotes]  = useState([]);
+  const [notFound, setNotFound]= useState(false);
+  const [reactionsByQuote, setReactionsByQuote] = useState({});
+  const viewer = Session.get();
+
   useEffect(() => {
-    try {
-      const [t] = atob(shareParam).split("::");
-      setTag(t);
-      supabase.from("quotes").select("*").eq("tag", t).order("date", {ascending:false}).then(({data})=>setQuotes(data||[]));
-    } catch { setQuotes([]); }
-  }, []);
+    const load = async () => {
+      const { data:w } = await supabase.from("walls").select("*").eq("share_token", shareToken).eq("visibility", "public_unlisted").single();
+      if (!w) { setNotFound(true); return; }
+      setWall(w);
+      const { data:qs } = await supabase.from("quotes").select("*").eq("wall_id", w.id).order("date", {ascending:false});
+      setQuotes(qs || []);
+      if (viewer && qs?.length) setReactionsByQuote(await loadReactionMap(qs.map(q=>q.id), viewer.id));
+    };
+    load();
+  }, [shareToken]);
+
+  const toggleReaction = async (quoteId, emoji) => {
+    if (!viewer) return;
+    const existing = (reactionsByQuote[quoteId]||[]).find(r=>r.emoji===emoji && r.reacted);
+    if (existing) {
+      await supabase.from("reactions").delete().eq("quote_id", quoteId).eq("user_id", viewer.id).eq("emoji", emoji);
+    } else {
+      await supabase.from("reactions").insert([{ quote_id: quoteId, user_id: viewer.id, emoji }]);
+    }
+    setReactionsByQuote(await loadReactionMap(quotes.map(q=>q.id), viewer.id));
+  };
+
+  if (notFound) {
+    return (
+      <div className="app-wrapper">
+        <FontLoader theme={{mode:"dark"}}/>
+        <div className="empty-state"><h2>This wall isn't public (or doesn't exist)</h2></div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-wrapper">
       <FontLoader theme={{mode:"dark"}}/>
-      <div className="readonly-banner">👀 Read-only view of <strong>#{tag}</strong></div>
+      <div className="readonly-banner">👀 {wall ? `Viewing "${wall.name}"` : "Loading…"} — view only</div>
       <div style={{padding:"24px 20px 60px",maxWidth:1100,margin:"0 auto"}}>
+        {!viewer && (
+          <div style={{textAlign:"center",marginBottom:20}}>
+            <a href="/" style={{textDecoration:"none"}}><button className="btn btn-primary btn-sm">Make your own wall on Quotzit</button></a>
+            <div style={{fontFamily:"var(--font-ui)",fontSize:"0.72rem",color:"rgba(245,239,224,0.5)",marginTop:6}}>sign in to react to these quotes</div>
+          </div>
+        )}
         <div className="notes-grid">
-          {quotes.map(q=><StickyNote key={q.id} quote={q} canEdit={false} canDelete={false} onEdit={()=>{}} onDelete={()=>{}}/>)}
+          {quotes.map(q=>(
+            <StickyNote key={q.id} quote={q} canEdit={false} canDelete={false}
+              reactions={reactionsByQuote[q.id]}
+              onToggleReaction={viewer ? toggleReaction : null}
+              onEdit={()=>{}} onDelete={()=>{}}/>
+          ))}
         </div>
         {!quotes.length && <div className="empty-state"><h2>Nothing pinned yet</h2></div>}
       </div>
@@ -787,18 +899,18 @@ const InviteLanding = ({ token }) => {
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase.from("invite_tokens").select("group_id, groups(name)").eq("token", token).single();
-      if (data) setJoinInfo({ groupId: data.group_id, groupName: data.groups?.name });
+      const { data } = await supabase.from("invite_tokens").select("wall_id, walls(name)").eq("token", token).single();
+      if (data) setJoinInfo({ wallId: data.wall_id, wallName: data.walls?.name });
       setLoading(false);
     };
     load();
   }, [token]);
 
-  const handleAuth = (user, groupName) => {
-    // clear invite param and reload into the app, landing on that group's wall
+  const handleAuth = (user, wallId) => {
+    // clear invite param and reload into the app, landing on that wall
     const url = new URL(window.location.href);
     url.searchParams.delete("invite");
-    url.searchParams.set("wall", groupName || "");
+    if (wallId) url.searchParams.set("wall", wallId);
     window.location.replace(url.toString());
   };
 
@@ -816,7 +928,7 @@ const InviteLanding = ({ token }) => {
       <div className="landing-quote-wrap">
         <div className="landing-note">
           <div className="landing-note-text">"Psst! Don't forget what we said!"</div>
-          <div className="landing-note-meta">Join <strong>#{joinInfo.groupName}</strong> on Quotzit</div>
+          <div className="landing-note-meta">Join <strong>{joinInfo.wallName}</strong> on Quotzit</div>
         </div>
       </div>
       <div className="landing-actions">
@@ -830,89 +942,102 @@ const InviteLanding = ({ token }) => {
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function Quotzit() {
-  const params     = new URLSearchParams(window.location.search);
-  const shareParam = params.get("share");
-  const inviteToken= params.get("invite");
-  const wallParam  = params.get("wall");
+  const params      = new URLSearchParams(window.location.search);
+  const publicToken = params.get("w");
+  const inviteToken = params.get("invite");
+  const wallParam   = params.get("wall"); // wall id to select after login/invite redirect
 
-  if (shareParam)  return <ReadOnlyWall shareParam={shareParam}/>;
+  if (publicToken) return <PublicWall shareToken={publicToken}/>;
   if (inviteToken) return <InviteLanding token={inviteToken}/>;
 
   const [user,       setUser]      = useState(Session.get);
   const [screen,     setScreen]    = useState(user ? "wall" : "landing"); // landing | login | signup | wall
   const [quotes,     setQuotes]    = useState([]);
-  const [myTags,     setMyTags]    = useState([]);
-  const [activeTag,  setActive]    = useState(wallParam || null);
+  const [myWalls,    setMyWalls]   = useState([]);
+  const [activeWallId, setActiveWallId] = useState(wallParam || null);
   const [filterWho,  setFilterWho] = useState("");
   const [filterWhere,setFilterWhere]=useState("");
   const [search,     setSearch]    = useState("");
   const [showAdd,    setShowAdd]   = useState(false);
   const [editQ,      setEditQ]     = useState(null);
-  const [shareTag,   setShare]     = useState(null);
+  const [shareWallId,setShareWallId]=useState(null);
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [showSettings,setShowSettings]=useState(false);
   const [loading,    setLoading]   = useState(false);
   const [theme,      setTheme]     = useState(ThemeStore.get);
-  const [groupCovers,setGroupCovers]=useState({});
-  const [isGroupOwner,setIsGroupOwner]=useState(false);
+  const [wallCovers, setWallCovers]= useState({});
+  const [reactionsByQuote, setReactionsByQuote] = useState({});
   const coverFileRef = useRef(null);
 
   const handleThemeChange = t => { setTheme(t); ThemeStore.set(t); };
 
-  const loadQuotes = async (u) => {
-    setLoading(true);
-    const { data:memberships } = await supabase.from("group_members").select("group_id, groups(name)").eq("user_id", u.id);
-    const groupNames = (memberships||[]).map(m=>m.groups?.name).filter(Boolean);
-    let q = [];
-    const { data:own } = await supabase.from("quotes").select("*").eq("author_id", u.id).order("date", {ascending:false});
-    q = [...(own||[])];
-    if (groupNames.length) {
-      const { data:shared } = await supabase.from("quotes").select("*").in("tag", groupNames).order("date", {ascending:false});
-      q = [...q, ...(shared||[])];
-    }
-    const seen = new Set();
-    q = q.filter(x=>{ if(seen.has(x.id)) return false; seen.add(x.id); return true; });
-    q.sort((a,b)=>new Date(b.date)-new Date(a.date));
-    setQuotes(q);
-    setMyTags([...new Set(q.map(x=>x.tag).filter(Boolean))]);
-    setLoading(false);
-  };
-
-  useEffect(() => { if (user) { loadQuotes(user); loadGroupCovers(user); } }, [user]);
-
-  const loadGroupCovers = async (u) => {
-    const { data:groups } = await supabase.from("groups").select("name,cover_url,owner_id");
-    if (!groups) return;
+  const loadWalls = async (u) => {
+    const { data:memberships } = await supabase.from("wall_members").select("wall_id, walls(*)").eq("user_id", u.id);
+    const walls = (memberships||[]).map(m=>m.walls).filter(Boolean)
+      .sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+    setMyWalls(walls);
     const covers = {};
-    groups.forEach(g => { if (g.cover_url) covers[g.name] = g.cover_url; });
-    setGroupCovers(covers);
+    walls.forEach(w => { if (w.cover_url) covers[w.id] = w.cover_url; });
+    setWallCovers(covers);
+    return walls;
   };
 
-  // check if current user owns the active tag group
+  const loadQuotes = async (u, walls) => {
+    setLoading(true);
+    const wallIds = (walls||myWalls).map(w=>w.id);
+    let q = [];
+    if (wallIds.length) {
+      const { data } = await supabase.from("quotes").select("*").in("wall_id", wallIds).order("date", {ascending:false});
+      q = data || [];
+    }
+    setQuotes(q);
+    setLoading(false);
+    if (q.length) loadReactions(q.map(x=>x.id), u.id);
+  };
+
   useEffect(() => {
-    const check = async () => {
-      if (!activeTag || !user) { setIsGroupOwner(false); return; }
-      const { data } = await supabase.from("groups").select("id").eq("name", activeTag).eq("owner_id", user.id).single();
-      setIsGroupOwner(!!data);
-    };
-    check();
-  }, [activeTag, user]);
+    if (!user) return;
+    (async () => {
+      const walls = await loadWalls(user);
+      await loadQuotes(user, walls);
+    })();
+  }, [user]);
+
+  const loadReactions = async (quoteIds, uid) => {
+    setReactionsByQuote(await loadReactionMap(quoteIds, uid));
+  };
+
+  const toggleReaction = async (quoteId, emoji) => {
+    const existing = (reactionsByQuote[quoteId]||[]).find(r=>r.emoji===emoji && r.reacted);
+    if (existing) {
+      await supabase.from("reactions").delete().eq("quote_id", quoteId).eq("user_id", user.id).eq("emoji", emoji);
+    } else {
+      await supabase.from("reactions").insert([{ quote_id: quoteId, user_id: user.id, emoji }]);
+    }
+    loadReactions(quotes.map(q=>q.id), user.id);
+  };
+
+  const activeWall = myWalls.find(w=>w.id===activeWallId) || null;
+  const isWallOwner = !!activeWall && activeWall.owner_id === user?.id;
 
   const uploadCoverPhoto = async (file) => {
-    if (!file || !activeTag) return;
+    if (!file || !activeWall) return;
     const ext = file.name.split(".").pop();
-    const path = `${user.id}/${activeTag.replace(/\s+/g,"-")}-${Date.now()}.${ext}`;
+    const path = `${user.id}/${activeWall.id}-${Date.now()}.${ext}`;
     const { error:upErr } = await supabase.storage.from("group-covers").upload(path, file, { upsert: true });
     if (upErr) return alert("Upload failed. Please try again.");
     const { data:urlData } = supabase.storage.from("group-covers").getPublicUrl(path);
     const url = urlData.publicUrl;
-    await supabase.from("groups").update({ cover_url: url }).eq("name", activeTag).eq("owner_id", user.id);
-    setGroupCovers(prev => ({ ...prev, [activeTag]: url }));
+    await supabase.from("walls").update({ cover_url: url }).eq("id", activeWall.id);
+    setWallCovers(prev => ({ ...prev, [activeWall.id]: url }));
+    setMyWalls(prev => prev.map(w=>w.id===activeWall.id ? {...w, cover_url:url} : w));
   };
 
   const removeCoverPhoto = async () => {
-    await supabase.from("groups").update({ cover_url: null }).eq("name", activeTag).eq("owner_id", user.id);
-    setGroupCovers(prev => { const n = {...prev}; delete n[activeTag]; return n; });
+    if (!activeWall) return;
+    await supabase.from("walls").update({ cover_url: null }).eq("id", activeWall.id);
+    setWallCovers(prev => { const n = {...prev}; delete n[activeWall.id]; return n; });
+    setMyWalls(prev => prev.map(w=>w.id===activeWall.id ? {...w, cover_url:null} : w));
   };
 
   // clear wall param from URL after using it
@@ -931,8 +1056,9 @@ export default function Quotzit() {
       const existing = prev.find(x=>x.id===q.id);
       return existing ? prev.map(x=>x.id===q.id?q:x) : [q,...prev];
     });
-    setMyTags(prev=>[...new Set([...prev,q.tag].filter(Boolean))]);
   };
+
+  const handleNewWall = (wall) => { setMyWalls(prev => [...prev, wall]); };
 
   const deleteQuote = async id => {
     await supabase.from("quotes").delete().eq("id", id);
@@ -940,13 +1066,13 @@ export default function Quotzit() {
   };
 
   const deleteAccount = async () => {
-    await supabase.from("group_members").delete().eq("user_id", user.id);
+    await supabase.from("wall_members").delete().eq("user_id", user.id);
     await supabase.from("quotes").delete().eq("author_id", user.id);
     await supabase.from("users").delete().eq("id", user.id);
     Session.clear(); setUser(null); setScreen("landing");
   };
 
-  const logout = () => { Session.clear(); setUser(null); setScreen("landing"); setQuotes([]); setMyTags([]); };
+  const logout = () => { Session.clear(); setUser(null); setScreen("landing"); setQuotes([]); setMyWalls([]); };
 
   // unique filter options
   const whoOptions   = [...new Set(quotes.map(q=>q.said_by).filter(Boolean))].sort();
@@ -954,26 +1080,27 @@ export default function Quotzit() {
 
   // apply all filters
   const visibleQuotes = quotes.filter(q => {
-    if (activeTag   && q.tag      !== activeTag)   return false;
-    if (filterWho   && q.said_by  !== filterWho)   return false;
-    if (filterWhere && q.location !== filterWhere) return false;
+    if (activeWallId && q.wall_id  !== activeWallId) return false;
+    if (filterWho    && q.said_by  !== filterWho)    return false;
+    if (filterWhere  && q.location !== filterWhere)  return false;
     if (search) {
       const s = search.toLowerCase();
-      const haystack = [q.text, q.said_by, q.location, q.tag].filter(Boolean).join(" ").toLowerCase();
+      const wallName = myWalls.find(w=>w.id===q.wall_id)?.name || "";
+      const haystack = [q.text, q.said_by, q.location, wallName].filter(Boolean).join(" ").toLowerCase();
       if (!haystack.includes(s)) return false;
     }
     return true;
   });
 
-  const hasFilters = activeTag || filterWho || filterWhere || search;
-  const clearFilters = () => { setActive(null); setFilterWho(""); setFilterWhere(""); setSearch(""); };
+  const hasFilters = activeWallId || filterWho || filterWhere || search;
+  const clearFilters = () => { setActiveWallId(null); setFilterWho(""); setFilterWhere(""); setSearch(""); };
 
   // ── Screens ──
   if (screen === "landing") return <LandingPage onSignIn={()=>setScreen("login")} onSignUp={()=>setScreen("signup")}/>;
   if (screen === "login")   return <AuthScreen initialMode="login"  onAuth={handleAuth} onBack={()=>setScreen("landing")}/>;
   if (screen === "signup")  return <AuthScreen initialMode="signup" onAuth={handleAuth} onBack={()=>setScreen("landing")}/>;
 
-  const activeCover = activeTag ? groupCovers[activeTag] : null;
+  const activeCover = activeWall ? wallCovers[activeWall.id] : null;
   const effectiveTheme = activeCover ? { ...theme, bg: activeCover } : theme;
 
   return (
@@ -981,7 +1108,7 @@ export default function Quotzit() {
       <FontLoader theme={effectiveTheme}/>
 
       <div className="topbar">
-        <div className="topbar-logo" onClick={()=>{setActive(null);clearFilters();}}>Quotzit</div>
+        <div className="topbar-logo" onClick={()=>{setActiveWallId(null);clearFilters();}}>Quotzit</div>
         <div className="topbar-right">
           <span className="topbar-greeting">hey, {user.name}</span>
           <button className="btn btn-primary btn-sm" onClick={()=>setShowAdd(true)}>+ Pin Quote</button>
@@ -994,13 +1121,13 @@ export default function Quotzit() {
         <div className="wall-header">
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div className="wall-title">
-              {activeTag ? <><em>#</em>{activeTag}</> : <>The Wall <em>✦</em></>}
+              {activeWall ? activeWall.name : <>The Wall <em>✦</em></>}
             </div>
             <button className="btn btn-ghost btn-sm"
-              onClick={()=>{ activeTag ? setShare(activeTag) : setShowGroupPicker(true); }}>
+              onClick={()=>{ activeWall ? setShareWallId(activeWall.id) : setShowGroupPicker(true); }}>
               Share
             </button>
-            {activeTag && isGroupOwner && (
+            {activeWall && isWallOwner && (
               <>
                 <button className="btn btn-ghost btn-sm"
                   onClick={()=>coverFileRef.current?.click()}
@@ -1031,10 +1158,10 @@ export default function Quotzit() {
         {/* Filters */}
         <div className="filter-row">
           <span className="filter-label">Filter:</span>
-          {myTags.length > 0 && (
-            <select className="filter-select" value={activeTag||""} onChange={e=>setActive(e.target.value||null)}>
-              <option value="">All tags</option>
-              {myTags.map(t=><option key={t} value={t}>#{t}</option>)}
+          {myWalls.length > 0 && (
+            <select className="filter-select" value={activeWallId||""} onChange={e=>setActiveWallId(e.target.value||null)}>
+              <option value="">All walls</option>
+              {myWalls.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
           )}
           {whoOptions.length > 0 && (
@@ -1067,8 +1194,11 @@ export default function Quotzit() {
           <div className="notes-grid">
             {visibleQuotes.map(q=>(
               <StickyNote key={q.id} quote={q}
+                wallName={myWalls.find(w=>w.id===q.wall_id)?.name}
                 canEdit={q.author_id===user.id}
-                canDelete={q.author_id===user.id}
+                canDelete={q.author_id===user.id || myWalls.find(w=>w.id===q.wall_id)?.owner_id===user.id}
+                reactions={reactionsByQuote[q.id]}
+                onToggleReaction={toggleReaction}
                 onEdit={setEditQ} onDelete={deleteQuote}/>
             ))}
           </div>
@@ -1076,26 +1206,28 @@ export default function Quotzit() {
       </div>
 
       {(showAdd || editQ) && (
-        <QuoteForm user={user} myTags={myTags} initial={editQ||null}
-          onSave={saveQuote} onClose={()=>{setShowAdd(false);setEditQ(null);}}/>
+        <QuoteForm user={user} myWalls={myWalls} initial={editQ||null}
+          onSave={saveQuote} onNewWall={handleNewWall} onClose={()=>{setShowAdd(false);setEditQ(null);}}/>
       )}
-      {shareTag && <ShareModal tag={shareTag} user={user} onClose={()=>setShare(null)}/>}
+      {shareWallId && <ShareModal wall={myWalls.find(w=>w.id===shareWallId)} user={user}
+        onWallUpdate={(w)=>setMyWalls(prev=>prev.map(x=>x.id===w.id?w:x))}
+        onClose={()=>setShareWallId(null)}/>}
       {showGroupPicker && (
         <Portal>
         <div className="overlay" onClick={e=>e.target===e.currentTarget&&setShowGroupPicker(false)}>
           <div className="modal" style={{maxWidth:340}}>
             <button className="modal-close" onClick={()=>setShowGroupPicker(false)}>✕</button>
             <div className="modal-title" style={{marginBottom:16}}>Which wall?</div>
-            {myTags.length === 0 ? (
+            {myWalls.length === 0 ? (
               <div style={{fontFamily:"var(--font-ui)",fontSize:"0.9rem",color:"#aaa",fontStyle:"italic",textAlign:"center",padding:"20px 0"}}>
-                No groups yet — tag a quote to create one!
+                No walls yet.
               </div>
             ) : (
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {myTags.map(t=>(
-                  <button key={t} className="btn btn-ghost" style={{textAlign:"left",justifyContent:"flex-start",color:"var(--ink)",background:"#faf7f2",border:"1.5px solid #e8dfc8",fontFamily:"var(--font-ui)",fontSize:"0.92rem"}}
-                    onClick={()=>{ setShowGroupPicker(false); setShare(t); }}>
-                    #{t}
+                {myWalls.map(w=>(
+                  <button key={w.id} className="btn btn-ghost" style={{textAlign:"left",justifyContent:"flex-start",color:"var(--ink)",background:"#faf7f2",border:"1.5px solid #e8dfc8",fontFamily:"var(--font-ui)",fontSize:"0.92rem"}}
+                    onClick={()=>{ setShowGroupPicker(false); setShareWallId(w.id); }}>
+                    {w.name}
                   </button>
                 ))}
               </div>
