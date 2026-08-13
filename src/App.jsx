@@ -389,7 +389,7 @@ const QuoteForm = ({ user, myWalls, initial, onSave, onNewWall, onClose }) => {
   const [loc,     setLoc]    = useState(initial?.location ?? "");
   const [wallId,  setWallId] = useState(initial?.wall_id ?? myWalls[0]?.id ?? "");
   const [newWallName, setNewWallName] = useState("");
-  const [showNew, setShowNew]= useState(false);
+  const [showNew, setShowNew]= useState(myWalls.length === 0);
   const [date,    setDate]   = useState(initial ? toLocalDate(initial.date) : toLocalDate(now));
   const [time,    setTime]   = useState(initial ? toLocalTime(initial.date) : toLocalTime(now));
   const [color,   setColor]  = useState(initial?.color   ?? "note-yellow");
@@ -481,7 +481,9 @@ const QuoteForm = ({ user, myWalls, initial, onSave, onNewWall, onClose }) => {
           ) : (
             <>
               <input value={newWallName} onChange={e=>setNewWallName(e.target.value)} placeholder="e.g. girls weekend" style={{...selStyle,marginBottom:4}} />
-              <span style={{fontFamily:"var(--font-ui)",fontSize:"0.75rem",color:"#999",cursor:"pointer",textDecoration:"underline"}} onClick={()=>{setShowNew(false);setNewWallName("");}}>← back to existing walls</span>
+              {myWalls.length > 0 && (
+                <span style={{fontFamily:"var(--font-ui)",fontSize:"0.75rem",color:"#999",cursor:"pointer",textDecoration:"underline"}} onClick={()=>{setShowNew(false);setNewWallName("");}}>← back to existing walls</span>
+              )}
             </>
           )}
         </div>
