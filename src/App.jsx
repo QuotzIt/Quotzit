@@ -18,20 +18,20 @@ const ROTATIONS = [-3,-2,-1,0,1,2,3];
 const visIcon = w => w?.visibility === "public_unlisted" ? "🌐" : "🔒";
 
 const FONT_OPTIONS = [
-  { label:"Casual",  value:"casual",  css:"'Caveat', cursive" },
-  { label:"Sharpie", value:"sharpie", css:"'Permanent Marker', cursive" },
-  { label:"Messy",   value:"messy",   css:"'Reenie Beanie', cursive" },
-  { label:"Neat",    value:"neat",    css:"'Indie Flower', cursive" },
+  { label:"Caveat",  value:"caveat",  css:"'Caveat', cursive" },
+  { label:"Kalam",   value:"kalam",   css:"'Kalam', cursive" },
+  { label:"Shadows", value:"shadows", css:"'Shadows Into Light', cursive" },
 ];
 const FONT_MAP = Object.fromEntries(FONT_OPTIONS.map(f=>[f.value,f.css]));
 
 const COLOR_OPTIONS = [
-  { value:"note-yellow", hex:"#fef08a" },
-  { value:"note-blue",   hex:"#bfdbfe" },
-  { value:"note-green",  hex:"#bbf7d0" },
-  { value:"note-pink",   hex:"#fecdd3" },
-  { value:"note-white",  hex:"#fafafa" },
+  { value:"marker-black", hex:"#1F1F1F" },
+  { value:"marker-blue",  hex:"#2563AC" },
+  { value:"marker-red",   hex:"#D6432A" },
+  { value:"marker-green", hex:"#2F9E44" },
 ];
+const COLOR_MAP = Object.fromEntries(COLOR_OPTIONS.map(c=>[c.value,c.hex]));
+const randFontSize = () => 22 + Math.floor(Math.random()*13);
 
 const REACTION_EMOJIS = ["❤️","😂","😮","👏","😢"];
 
@@ -40,12 +40,6 @@ const Session = {
   get:   () => { try { return JSON.parse(sessionStorage.getItem("qz_user")); } catch { return null; } },
   set:   u  => sessionStorage.setItem("qz_user", JSON.stringify(u)),
   clear: () => sessionStorage.removeItem("qz_user"),
-};
-
-// ── Theme (localStorage) ──────────────────────────────────────────────────────
-const ThemeStore = {
-  get:  () => { try { return JSON.parse(localStorage.getItem("qz_theme")) || { mode:"dark", bg:null }; } catch { return { mode:"dark", bg:null }; } },
-  set:  t  => localStorage.setItem("qz_theme", JSON.stringify(t)),
 };
 
 // ── Speech ────────────────────────────────────────────────────────────────────
@@ -71,49 +65,42 @@ const useSpeech = onResult => {
 };
 
 // ── Global Styles ─────────────────────────────────────────────────────────────
-const FontLoader = ({ theme }) => {
-  const isDark = theme?.mode !== "light";
-  const hasBg  = !!theme?.bg;
+const FontLoader = () => {
   return (
     <style>{`
-      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Caveat:wght@400;600;700&family=Reenie+Beanie&family=Permanent+Marker&family=Indie+Flower&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Caveat:wght@400;600;700&family=Kalam:wght@400;700&family=Shadows+Into+Light&family=Permanent+Marker&display=swap');
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-      body { background: ${isDark ? "#2c3e4a" : "#f0ebe0"}; }
+      body { background: #FAFAF6; }
       :root {
-        --wall:        ${isDark ? "#2c3e4a" : "#e8e0d0"};
-        --wall-deep:   ${isDark ? "#1e2d36" : "#d4c9b5"};
-        --wall-mid:    ${isDark ? "#374f5e" : "#c8bda8"};
-        --topbar-bg:   ${isDark ? "rgba(22,34,42,0.92)" : "rgba(255,252,245,0.92)"};
-        --topbar-border: ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)"};
-        --logo-color:  ${isDark ? "#fef08a" : "#8B5E3C"};
-        --cream:       ${isDark ? "#f5efe0" : "#3a2a1a"};
-        --pin-red:     #cc3333;
-        --pin-shadow:  rgba(0,0,0,0.5);
-        --note-yellow: #fef08a;
-        --note-blue:   #bfdbfe;
-        --note-green:  #bbf7d0;
-        --note-pink:   #fecdd3;
-        --note-white:  #fafafa;
-        --ink:         #1e1e1e;
-        --ink-faded:   #666;
-        --font-ui:     'Playfair Display', Georgia, serif;
-        --font-hand:   'Caveat', cursive;
-        --font-marker: 'Permanent Marker', cursive;
+        --surface:      #FAFAF6;
+        --card:         #FFFFFF;
+        --topbar-bg:    rgba(255,255,255,0.88);
+        --topbar-border: rgba(0,0,0,0.08);
+        --ink-black:    #1F1F1F;
+        --ink-blue:     #2563AC;
+        --ink-red:      #D6432A;
+        --ink-green:    #2F9E44;
+        --attribution:  #6B6B68;
+        --pin-red:      #cc3333;
+        --pin-shadow:   rgba(0,0,0,0.35);
+        --ink:          #1F1F1F;
+        --ink-faded:    #6B6B68;
+        --font-ui:      'Inter', sans-serif;
+        --font-hand:    'Caveat', cursive;
+        --font-marker:  'Permanent Marker', cursive;
       }
 
       .app-wrapper {
         min-height: 100vh;
-        background-color: var(--wall);
-        ${hasBg ? `background-image: url("${theme.bg}"); background-size: cover; background-position: center; background-attachment: fixed;` :
-          isDark ?
-          `background-image: radial-gradient(ellipse at 15% 25%, rgba(74,101,114,0.5) 0%, transparent 55%), radial-gradient(ellipse at 85% 75%, rgba(30,45,54,0.65) 0%, transparent 50%);` :
-          `background-image: radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.6) 0%, transparent 60%);`
-        }
-      }
-      .app-wrapper.has-bg::after {
-        content: ''; position: fixed; inset: 0;
-        background: ${isDark ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.35)"};
-        pointer-events: none; z-index: 0;
+        background-color: var(--surface);
+        background-image:
+          radial-gradient(ellipse 320px 130px at 12% 18%, rgba(0,0,0,0.035), transparent 70%),
+          radial-gradient(ellipse 220px 90px at 82% 12%, rgba(0,0,0,0.03), transparent 70%),
+          radial-gradient(ellipse 260px 140px at 72% 55%, rgba(0,0,0,0.025), transparent 70%),
+          radial-gradient(ellipse 200px 100px at 8% 72%, rgba(0,0,0,0.03), transparent 70%),
+          radial-gradient(ellipse 260px 110px at 42% 92%, rgba(0,0,0,0.025), transparent 70%),
+          radial-gradient(ellipse 180px 80px at 95% 80%, rgba(0,0,0,0.03), transparent 70%);
+        background-attachment: fixed;
       }
       .app-wrapper > *:not(style) { position: relative; z-index: 1; }
 
@@ -125,156 +112,136 @@ const FontLoader = ({ theme }) => {
         border-bottom: 1px solid var(--topbar-border);
         position: sticky; top: 0; z-index: 100;
       }
-      .topbar-logo { font-family: var(--font-marker); font-size: 1.8rem; color: var(--logo-color); letter-spacing: 1px; text-shadow: 1px 2px 8px rgba(0,0,0,0.3); cursor: pointer; }
+      .topbar-logo { font-family: var(--font-marker); font-size: 1.7rem; color: var(--ink-black); letter-spacing: 1px; cursor: pointer; }
       .topbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-      .topbar-greeting { font-family: var(--font-ui); font-style: italic; font-size: 0.88rem; color: ${isDark ? "rgba(245,239,224,0.55)" : "rgba(58,42,26,0.6)"}; white-space: nowrap; }
+      .topbar-greeting { font-family: var(--font-ui); font-size: 0.85rem; color: var(--attribution); white-space: nowrap; }
 
-      .btn { font-family: var(--font-ui); font-size: 0.85rem; font-weight: 700; letter-spacing: 0.03em; border: none; cursor: pointer; border-radius: 3px; padding: 8px 16px; transition: transform 0.12s, opacity 0.12s; }
+      .btn { font-family: var(--font-ui); font-size: 0.85rem; font-weight: 600; border: none; cursor: pointer; border-radius: 4px; padding: 8px 16px; transition: transform 0.12s, opacity 0.12s; }
       .btn:hover  { transform: translateY(-1px); opacity: 0.9; }
       .btn:active { transform: translateY(1px); }
-      .btn-primary { background: var(--note-yellow); color: var(--ink); box-shadow: 2px 3px 8px rgba(0,0,0,0.28); }
-      .btn-ghost   { background: transparent; color: var(--cream); border: 1.5px solid ${isDark ? "rgba(245,239,224,0.4)" : "rgba(58,42,26,0.35)"}; }
+      .btn-primary { background: var(--ink-black); color: #fff; }
+      .btn-ghost   { background: transparent; color: var(--ink-black); border: 1.5px solid rgba(0,0,0,0.18); }
       .btn-danger  { background: #fee2e2; color: #991b1b; border: 1.5px solid #fca5a5; }
       .btn-sm      { font-size: 0.76rem; padding: 5px 11px; }
-      .btn-cancel  { background: none; border: 1.5px solid #ddd; color: #999; font-family: var(--font-ui); font-size: 0.85rem; cursor: pointer; padding: 8px 16px; border-radius: 3px; }
+      .btn-cancel  { background: none; border: 1.5px solid #ddd; color: #999; font-family: var(--font-ui); font-size: 0.85rem; cursor: pointer; padding: 8px 16px; border-radius: 4px; }
       .icon-only   { background: none; border: none; cursor: pointer; font-size: 1.1rem; padding: 4px; line-height: 1; }
 
       /* ── LANDING ── */
-      .landing { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; background-color: var(--wall); background-image: radial-gradient(ellipse at 15% 25%, rgba(74,101,114,0.5) 0%, transparent 55%), radial-gradient(ellipse at 85% 75%, rgba(30,45,54,0.65) 0%, transparent 50%); }
-      .landing-logo { font-family: var(--font-marker); font-size: 4rem; color: var(--note-yellow); text-shadow: 2px 3px 14px rgba(0,0,0,0.5); margin-bottom: 6px; }
-      .landing-tagline { font-family: var(--font-ui); font-style: italic; font-size: 1.1rem; color: rgba(245,239,224,0.7); margin-bottom: 48px; text-align: center; }
+      .landing { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; background-color: var(--surface); }
+      .landing-logo { font-family: var(--font-marker); font-size: 3.6rem; color: var(--ink-black); margin-bottom: 6px; }
+      .landing-tagline { font-family: var(--font-ui); font-size: 1rem; color: var(--attribution); margin-bottom: 48px; text-align: center; }
       .landing-quote-wrap { position: relative; margin-bottom: 48px; }
-      .landing-note { background: var(--note-yellow); border-radius: 2px; padding: 28px 32px 22px; max-width: 380px; box-shadow: 4px 6px 22px rgba(0,0,0,0.3); transform: rotate(-2deg); position: relative; }
-      .landing-note::before { content:''; position:absolute; top:-10px; left:50%; transform:translateX(-50%); width:15px; height:15px; border-radius:50%; background:radial-gradient(circle at 38% 32%, #ff7777, var(--pin-red)); box-shadow:0 3px 7px var(--pin-shadow); }
-      .landing-note-text { font-family: 'Permanent Marker', cursive; font-size: 1.3rem; color: var(--ink); line-height: 1.5; margin-bottom: 10px; }
-      .landing-note-meta { font-family: var(--font-ui); font-size: 0.78rem; color: #666; font-style: italic; }
+      .landing-note { background: var(--card); border: 1px solid rgba(0,0,0,0.08); border-radius: 4px; padding: 28px 32px 22px; max-width: 380px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); position: relative; }
+      .landing-note-text { font-family: 'Caveat', cursive; font-size: 1.6rem; color: var(--ink-blue); line-height: 1.4; margin-bottom: 10px; }
+      .landing-note-meta { font-family: var(--font-ui); font-size: 0.78rem; color: var(--attribution); }
       .landing-actions { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 320px; }
       .landing-actions .btn { width: 100%; text-align: center; font-size: 1rem; padding: 14px; }
-      .landing-divider { font-family: var(--font-ui); font-style: italic; color: rgba(245,239,224,0.4); font-size: 0.85rem; }
+      .landing-divider { font-family: var(--font-ui); color: var(--attribution); font-size: 0.85rem; }
 
       /* ── AUTH ── */
-      .auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: var(--wall); background-image: radial-gradient(ellipse at 30% 40%, rgba(74,101,114,0.5) 0%, transparent 65%); padding: 20px; }
-      .auth-card { background: var(--note-white); border-radius: 2px; padding: 44px 38px 36px; width: 370px; max-width: 100%; box-shadow: 5px 7px 28px rgba(0,0,0,0.38); position: relative; }
-      .auth-card::before { content:''; position:absolute; top:-11px; left:50%; transform:translateX(-50%); width:18px; height:18px; border-radius:50%; background:radial-gradient(circle at 38% 32%, #ff7777, var(--pin-red)); box-shadow:0 3px 8px var(--pin-shadow); }
-      .auth-title { font-family:var(--font-marker); font-size:2.6rem; color:var(--ink); text-align:center; margin-bottom:3px; }
-      .auth-sub   { font-family:var(--font-ui); font-style:italic; font-size:0.95rem; color:var(--ink-faded); text-align:center; margin-bottom:28px; }
-      .auth-error { background:#fee2e2; color:#991b1b; border-radius:2px; padding:8px 12px; font-family:var(--font-ui); font-size:0.85rem; margin-bottom:14px; }
-      .auth-info  { background:#e0f2fe; color:#0369a1; border-radius:2px; padding:8px 12px; font-family:var(--font-ui); font-size:0.85rem; margin-bottom:14px; }
-      .auth-toggle { text-align:center; margin-top:14px; font-family:var(--font-ui); font-style:italic; font-size:0.88rem; color:var(--ink-faded); }
-      .auth-toggle span { color:#7a4f1e; cursor:pointer; text-decoration:underline; }
+      .auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: var(--surface); padding: 20px; }
+      .auth-card { background: var(--card); border: 1px solid rgba(0,0,0,0.08); border-radius: 4px; padding: 44px 38px 36px; width: 370px; max-width: 100%; box-shadow: 0 4px 20px rgba(0,0,0,0.08); position: relative; }
+      .auth-title { font-family:var(--font-marker); font-size:2.4rem; color:var(--ink-black); text-align:center; margin-bottom:3px; }
+      .auth-sub   { font-family:var(--font-ui); font-size:0.92rem; color:var(--ink-faded); text-align:center; margin-bottom:28px; }
+      .auth-error { background:#fee2e2; color:#991b1b; border-radius:4px; padding:8px 12px; font-family:var(--font-ui); font-size:0.85rem; margin-bottom:14px; }
+      .auth-info  { background:#e0f2fe; color:#0369a1; border-radius:4px; padding:8px 12px; font-family:var(--font-ui); font-size:0.85rem; margin-bottom:14px; }
+      .auth-toggle { text-align:center; margin-top:14px; font-family:var(--font-ui); font-size:0.88rem; color:var(--ink-faded); }
+      .auth-toggle span { color:var(--ink-blue); cursor:pointer; text-decoration:underline; }
 
       /* ── FIELDS ── */
       .field { margin-bottom: 14px; }
-      .field label { display:block; font-family:var(--font-ui); font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-faded); margin-bottom:5px; }
-      .field input, .field select, .field textarea { width:100%; font-family:var(--font-hand); font-size:1.05rem; padding:9px 12px; border:1.5px solid #d4c4a8; border-radius:2px; background:#fffdf5; color:var(--ink); outline:none; transition:border-color 0.15s; }
-      .field input:focus, .field select:focus, .field textarea:focus { border-color:#4a6572; }
+      .field label { display:block; font-family:var(--font-ui); font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-faded); margin-bottom:5px; }
+      .field input, .field select, .field textarea { width:100%; font-family:var(--font-ui); font-size:0.95rem; padding:9px 12px; border:1.5px solid #ddd; border-radius:4px; background:#fff; color:var(--ink); outline:none; transition:border-color 0.15s; }
+      .field input:focus, .field select:focus, .field textarea:focus { border-color:var(--ink-blue); }
       .field textarea { resize:vertical; min-height:80px; }
 
       /* ── WALL ── */
       .wall-area { padding: 24px 20px 60px; max-width: 1100px; margin: 0 auto; }
       .wall-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
-      .wall-title { font-family:var(--font-ui); font-size:1.5rem; font-weight:700; color:var(--cream); text-shadow:1px 2px 6px rgba(0,0,0,0.3); }
-      .wall-title em { font-style:italic; font-weight:400; opacity:0.7; }
+      .wall-title { font-family:var(--font-ui); font-size:1.4rem; font-weight:700; color:var(--ink-black); }
+      .wall-title em { font-style:normal; font-weight:400; color:var(--attribution); }
 
       /* ── SEARCH ── */
       .search-bar { position: relative; margin-bottom: 14px; }
-      .search-bar input { width:100%; font-family:var(--font-ui); font-size:0.9rem; padding:10px 16px 10px 40px; border-radius:4px; border:1.5px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.15)"}; background:${isDark ? "rgba(22,34,42,0.7)" : "rgba(255,255,255,0.7)"}; color:var(--cream); outline:none; backdrop-filter:blur(4px); }
-      .search-bar input::placeholder { color:${isDark ? "rgba(245,239,224,0.35)" : "rgba(58,42,26,0.4)"}; }
-      .search-bar input:focus { border-color:${isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)"}; }
+      .search-bar input { width:100%; font-family:var(--font-ui); font-size:0.9rem; padding:10px 16px 10px 40px; border-radius:6px; border:1.5px solid rgba(0,0,0,0.12); background:#fff; color:var(--ink-black); outline:none; }
+      .search-bar input::placeholder { color:#aaa; }
+      .search-bar input:focus { border-color:var(--ink-blue); }
       .search-icon { position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:0.9rem; pointer-events:none; opacity:0.5; }
       .search-clear { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:0.9rem; opacity:0.5; }
 
       /* ── FILTERS ── */
       .filter-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
-      .filter-label { font-family:var(--font-ui); font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:${isDark ? "rgba(245,239,224,0.4)" : "rgba(58,42,26,0.5)"}; }
-      .filter-select { font-family:var(--font-ui); font-size:0.78rem; padding:5px 10px; border-radius:20px; border:1.5px solid ${isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)"}; background:${isDark ? "rgba(22,34,42,0.7)" : "rgba(255,255,255,0.7)"}; color:var(--cream); outline:none; cursor:pointer; backdrop-filter:blur(4px); }
-      .filter-clear { font-family:var(--font-ui); font-size:0.72rem; color:${isDark ? "rgba(245,239,224,0.5)" : "rgba(58,42,26,0.5)"}; cursor:pointer; text-decoration:underline; background:none; border:none; padding:0; }
-
-      /* ── TAG ACCORDION ── */
-      .tag-accordion { background:${isDark ? "rgba(22,34,42,0.5)" : "rgba(255,255,255,0.5)"}; border-radius:4px; margin-bottom:14px; border:1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)"}; overflow:hidden; }
-      .tag-accordion-header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; cursor:pointer; font-family:var(--font-ui); font-size:0.76rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:${isDark ? "rgba(245,239,224,0.6)" : "rgba(58,42,26,0.6)"}; user-select:none; }
-      .tag-arrow { font-size:0.62rem; transition:transform 0.2s; }
-      .tag-arrow.open { transform:rotate(180deg); }
-      .tag-accordion-body { display:flex; flex-wrap:wrap; gap:6px; padding:10px 14px 14px; border-top:1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)"}; }
-      .tag-pill { font-family:var(--font-ui); font-size:0.75rem; font-weight:700; letter-spacing:0.04em; text-transform:lowercase; padding:4px 13px; border-radius:20px; cursor:pointer; border:1.5px solid transparent; transition:all 0.12s; background:${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}; color:${isDark ? "rgba(245,239,224,0.8)" : "rgba(58,42,26,0.8)"}; }
-      .tag-pill:hover { background:${isDark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.14)"}; }
-      .tag-pill.active { background:var(--note-yellow); color:var(--ink); box-shadow:2px 2px 6px rgba(0,0,0,0.2); }
+      .filter-label { font-family:var(--font-ui); font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--attribution); }
+      .filter-select { font-family:var(--font-ui); font-size:0.78rem; padding:5px 10px; border-radius:20px; border:1.5px solid rgba(0,0,0,0.15); background:#fff; color:var(--ink-black); outline:none; cursor:pointer; }
+      .filter-clear { font-family:var(--font-ui); font-size:0.72rem; color:var(--attribution); cursor:pointer; text-decoration:underline; background:none; border:none; padding:0; }
 
       /* ── NOTES GRID ── */
       .notes-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:26px; }
 
       /* ── STICKY NOTE ── */
-      .sticky { position:relative; padding:20px 16px 14px; border-radius:2px; box-shadow:3px 5px 16px rgba(0,0,0,0.26),1px 1px 0 rgba(255,255,255,0.18) inset; transition:transform 0.2s, box-shadow 0.2s; animation:pinDrop 0.3s cubic-bezier(0.34,1.5,0.64,1) both; }
+      .sticky { position:relative; background:var(--card); border:1px solid rgba(0,0,0,0.07); padding:20px 16px 14px; border-radius:3px; box-shadow:0 2px 8px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.05); transition:transform 0.2s, box-shadow 0.2s; animation:pinDrop 0.3s cubic-bezier(0.34,1.5,0.64,1) both; }
       @keyframes pinDrop { from{opacity:0;transform:translateY(-14px) rotate(var(--rot,0deg))} to{opacity:1;transform:translateY(0) rotate(var(--rot,0deg))} }
-      .sticky:hover { transform:rotate(0deg) translateY(-5px) scale(1.025)!important; box-shadow:6px 12px 28px rgba(0,0,0,0.34); z-index:10; }
-      .sticky::before { content:''; position:absolute; top:-10px; left:50%; transform:translateX(-50%); width:15px; height:15px; border-radius:50%; background:radial-gradient(circle at 38% 32%, #ff7777, var(--pin-red)); box-shadow:0 3px 7px var(--pin-shadow); z-index:2; }
-      .note-yellow{background:#fef08a} .note-blue{background:#bfdbfe} .note-green{background:#bbf7d0} .note-pink{background:#fecdd3} .note-white{background:#fafafa}
+      .sticky:hover { transform:rotate(0deg) translateY(-4px) scale(1.02)!important; box-shadow:0 8px 20px rgba(0,0,0,0.12); z-index:10; }
+      .sticky::before { content:''; position:absolute; top:-9px; left:50%; transform:translateX(-50%); width:13px; height:13px; border-radius:50%; background:radial-gradient(circle at 38% 32%, #ff7777, var(--pin-red)); box-shadow:0 2px 5px var(--pin-shadow); z-index:2; }
       .sticky-actions { position:absolute; top:7px; right:8px; display:flex; gap:3px; opacity:0; transition:opacity 0.15s; }
       .sticky:hover .sticky-actions, .touch-visible { opacity:1!important; }
       @media (hover:none) { .sticky-actions{opacity:1} }
-      .icon-btn { background:rgba(0,0,0,0.1); border:none; border-radius:3px; width:24px; height:24px; cursor:pointer; font-size:0.75rem; display:flex; align-items:center; justify-content:center; }
-      .icon-btn:hover { background:rgba(0,0,0,0.22); }
-      .sticky-quote { font-size:1.14rem; font-weight:600; line-height:1.42; color:var(--ink); margin-bottom:10px; word-break:break-word; }
-      .sticky-toggle { font-family:var(--font-ui); font-size:0.7rem; color:#555; display:flex; align-items:center; gap:4px; cursor:pointer; user-select:none; border:none; background:none; padding:0; }
-      .sticky-toggle:hover { color:#222; }
-      .s-arrow { font-size:0.58rem; transition:transform 0.18s; display:inline-block; }
-      .s-arrow.open { transform:rotate(180deg); }
-      .sticky-meta { font-family:var(--font-ui); font-size:0.74rem; color:#444; margin-top:8px; display:flex; flex-direction:column; gap:4px; border-top:1px dashed rgba(0,0,0,0.12); padding-top:8px; }
+      .icon-btn { background:rgba(0,0,0,0.06); border:none; border-radius:3px; width:24px; height:24px; cursor:pointer; font-size:0.75rem; display:flex; align-items:center; justify-content:center; }
+      .icon-btn:hover { background:rgba(0,0,0,0.14); }
+      .sticky-quote { font-weight:600; line-height:1.4; margin-bottom:10px; word-break:break-word; }
+      .sticky-quote::before { content:'\\201C'; }
+      .sticky-quote::after  { content:'\\201D'; }
+      .sticky-meta { font-family:var(--font-ui); font-size:0.74rem; color:var(--attribution); margin-top:8px; display:flex; flex-direction:column; gap:4px; border-top:1px dashed rgba(0,0,0,0.1); padding-top:8px; }
       .meta-row { display:flex; align-items:center; gap:5px; }
-      .sticky-tag { display:inline-block; margin-top:8px; font-family:var(--font-ui); font-size:0.66rem; font-weight:700; letter-spacing:0.06em; text-transform:lowercase; background:rgba(0,0,0,0.1); border-radius:10px; padding:2px 9px; }
 
       /* ── REACTIONS ── */
       .reaction-row { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
-      .reaction-chip { background:rgba(0,0,0,0.08); border:1.5px solid transparent; border-radius:14px; padding:3px 9px; font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all 0.12s; }
-      .reaction-chip:hover { background:rgba(0,0,0,0.16); }
-      .reaction-chip.active { background:var(--note-yellow); border-color:#b8930a; }
-      .reaction-count { font-family:var(--font-ui); font-size:0.68rem; font-weight:700; color:#555; }
+      .reaction-chip { background:rgba(0,0,0,0.05); border:1.5px solid transparent; border-radius:14px; padding:3px 9px; font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all 0.12s; }
+      .reaction-chip:hover { background:rgba(0,0,0,0.1); }
+      .reaction-chip.active { background:rgba(37,98,172,0.1); border-color:var(--ink-blue); }
+      .reaction-count { font-family:var(--font-ui); font-size:0.68rem; font-weight:700; color:var(--attribution); }
 
       /* ── MODAL ── */
-      .overlay { position:fixed; inset:0; background:rgba(0,0,0,0.65); display:flex; align-items:flex-start; justify-content:center; z-index:9999; animation:fadeIn 0.15s ease; padding:60px 16px 40px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+      .overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:flex-start; justify-content:center; z-index:9999; animation:fadeIn 0.15s ease; padding:60px 16px 40px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
       @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-      .modal { background:#fffdf5; width:460px; max-width:100%; max-height:90vh; overflow-y:auto; border-radius:2px; padding:36px 30px 28px; box-shadow:6px 9px 36px rgba(0,0,0,0.45); position:relative; animation:slideUp 0.22s cubic-bezier(0.34,1.4,0.64,1) both; }
+      .modal { background:#fff; width:460px; max-width:100%; max-height:90vh; overflow-y:auto; border-radius:6px; padding:36px 30px 28px; box-shadow:0 12px 40px rgba(0,0,0,0.22); position:relative; animation:slideUp 0.22s cubic-bezier(0.34,1.4,0.64,1) both; }
       @keyframes slideUp{from{transform:translateY(28px);opacity:0}to{transform:translateY(0);opacity:1}}
-      .modal::before { content:''; position:absolute; top:-11px; left:50%; transform:translateX(-50%); width:18px; height:18px; border-radius:50%; background:radial-gradient(circle at 38% 32%, #ff7777, var(--pin-red)); box-shadow:0 3px 8px var(--pin-shadow); }
-      .modal-title { font-family:var(--font-ui); font-size:1.3rem; font-weight:700; color:var(--ink); margin-bottom:20px; }
+      .modal-title { font-family:var(--font-ui); font-size:1.25rem; font-weight:700; color:var(--ink-black); margin-bottom:20px; }
       .modal-close { position:absolute; top:13px; right:15px; background:none; border:none; font-size:1.2rem; cursor:pointer; color:#bbb; }
       .modal-row { display:flex; gap:10px; }
       .modal-row .field { flex:1; }
       .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:8px; }
-      .section-label { font-family:var(--font-ui); font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.09em; color:#aaa; margin-bottom:6px; margin-top:14px; }
-      .divider { border:none; border-top:1px dashed #e0d8cc; margin:16px 0; }
+      .section-label { font-family:var(--font-ui); font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:#aaa; margin-bottom:6px; margin-top:14px; }
+      .divider { border:none; border-top:1px dashed #e5e5e5; margin:16px 0; }
 
       /* ── MIC ── */
-      .mic-btn { display:flex; align-items:center; justify-content:center; gap:7px; width:100%; padding:9px 14px; margin-bottom:14px; font-family:var(--font-ui); font-size:0.78rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; border:1.5px solid #d4c4a8; border-radius:2px; background:#faf5e8; cursor:pointer; color:var(--ink); transition:all 0.15s; }
+      .mic-btn { display:flex; align-items:center; justify-content:center; gap:7px; width:100%; padding:9px 14px; margin-bottom:14px; font-family:var(--font-ui); font-size:0.78rem; font-weight:600; text-transform:uppercase; border:1.5px solid #ddd; border-radius:4px; background:#f7f7f5; cursor:pointer; color:var(--ink-black); transition:all 0.15s; }
       .mic-btn.listening { background:#fee2e2; border-color:#f87171; color:#991b1b; animation:pulse 1s infinite; }
       @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}
 
       /* ── SWATCHES / FONTS ── */
       .swatch-row { display:flex; gap:8px; margin-top:4px; }
-      .swatch { width:28px; height:28px; border-radius:2px; cursor:pointer; border:2px solid rgba(0,0,0,0.12); transition:transform 0.12s,border-color 0.12s,box-shadow 0.12s; }
-      .swatch.active { border-color:#333; transform:scale(1.22); box-shadow:0 2px 7px rgba(0,0,0,0.3); }
+      .swatch { width:28px; height:28px; border-radius:50%; cursor:pointer; border:2px solid rgba(0,0,0,0.12); transition:transform 0.12s,border-color 0.12s,box-shadow 0.12s; }
+      .swatch.active { border-color:var(--ink-black); transform:scale(1.2); box-shadow:0 2px 6px rgba(0,0,0,0.25); }
       .font-picker { display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; }
-      .font-chip { padding:5px 13px; border-radius:2px; cursor:pointer; border:1.5px solid transparent; background:rgba(0,0,0,0.06); color:var(--ink); font-size:1rem; transition:all 0.12s; }
-      .font-chip.active { background:var(--note-yellow); border-color:#b8930a; }
+      .font-chip { padding:5px 13px; border-radius:4px; cursor:pointer; border:1.5px solid transparent; background:rgba(0,0,0,0.05); color:var(--ink-black); font-size:1rem; transition:all 0.12s; }
+      .font-chip.active { background:rgba(31,31,31,0.08); border-color:var(--ink-black); }
 
       /* ── SHARE ── */
-      .share-link-box { background:#f5f0e8; border:1.5px dashed #c4a87a; border-radius:2px; padding:10px 13px; font-family:var(--font-ui); font-size:0.78rem; color:var(--ink); word-break:break-all; margin-bottom:10px; }
-      .invite-item { font-family:var(--font-ui); font-size:0.8rem; padding:7px 0; border-bottom:1px dashed #e0d8cc; color:#555; display:flex; align-items:center; justify-content:space-between; }
+      .share-link-box { background:#f5f5f3; border:1.5px dashed #ccc; border-radius:4px; padding:10px 13px; font-family:var(--font-ui); font-size:0.78rem; color:var(--ink-black); word-break:break-all; margin-bottom:10px; }
+      .invite-item { font-family:var(--font-ui); font-size:0.8rem; padding:7px 0; border-bottom:1px dashed #e5e5e5; color:#555; display:flex; align-items:center; justify-content:space-between; }
 
       /* ── SETTINGS ── */
       .settings-section { margin-bottom:24px; }
-      .settings-section h3 { font-family:var(--font-ui); font-size:1rem; font-weight:700; color:var(--ink); margin-bottom:12px; padding-bottom:6px; border-bottom:1px dashed #e0d8cc; }
-      .theme-options { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
-      .theme-chip { padding:8px 16px; border-radius:3px; cursor:pointer; border:2px solid transparent; font-family:var(--font-ui); font-size:0.82rem; font-weight:700; transition:all 0.12s; }
-      .theme-chip.active { border-color:#4a6572; box-shadow:0 2px 8px rgba(0,0,0,0.15); }
-      .group-card { background:#faf7f2; border:1px solid #e8dfc8; border-radius:3px; padding:12px 14px; margin-bottom:10px; }
-      .group-card-title { font-family:var(--font-ui); font-size:0.85rem; font-weight:700; color:var(--ink); margin-bottom:8px; }
+      .settings-section h3 { font-family:var(--font-ui); font-size:1rem; font-weight:700; color:var(--ink-black); margin-bottom:12px; padding-bottom:6px; border-bottom:1px dashed #e5e5e5; }
+      .group-card { background:#f7f7f5; border:1px solid #e5e5e2; border-radius:4px; padding:12px 14px; margin-bottom:10px; }
+      .group-card-title { font-family:var(--font-ui); font-size:0.85rem; font-weight:700; color:var(--ink-black); margin-bottom:8px; }
 
       /* ── MISC ── */
-      .empty-state { text-align:center; padding:64px 20px; font-family:var(--font-ui); color:${isDark ? "rgba(245,239,224,0.45)" : "rgba(58,42,26,0.45)"}; }
-      .empty-state h2 { font-size:1.6rem; font-weight:700; font-style:italic; color:${isDark ? "rgba(245,239,224,0.7)" : "rgba(58,42,26,0.7)"}; margin-bottom:10px; }
-      .readonly-banner { background:var(--note-yellow); font-family:var(--font-ui); font-size:0.88rem; font-weight:700; text-align:center; padding:10px; color:var(--ink); }
-      .results-count { font-family:var(--font-ui); font-size:0.75rem; font-style:italic; color:${isDark ? "rgba(245,239,224,0.4)" : "rgba(58,42,26,0.4)"}; margin-bottom:12px; }
+      .empty-state { text-align:center; padding:64px 20px; font-family:var(--font-ui); color:var(--attribution); }
+      .empty-state h2 { font-size:1.4rem; font-weight:700; color:var(--ink-black); margin-bottom:10px; }
+      .readonly-banner { background:#efefea; border-bottom:1px solid rgba(0,0,0,0.08); font-family:var(--font-ui); font-size:0.88rem; font-weight:600; text-align:center; padding:10px; color:var(--ink-black); }
+      .results-count { font-family:var(--font-ui); font-size:0.75rem; color:var(--attribution); margin-bottom:12px; }
 
       @media (max-width:480px) {
         .notes-grid { grid-template-columns:1fr; gap:20px; }
@@ -289,7 +256,7 @@ const FontLoader = ({ theme }) => {
 // ── Landing Page ──────────────────────────────────────────────────────────────
 const LandingPage = ({ onSignIn, onSignUp }) => (
   <div className="landing">
-    <FontLoader theme={{ mode:"dark" }}/>
+    <FontLoader/>
     <div className="landing-logo">Quotzit</div>
     <div className="landing-tagline">the things people actually say ✦</div>
     <div className="landing-quote-wrap">
@@ -346,7 +313,7 @@ const AuthScreen = ({ initialMode="login", joinInfo, onAuth, onBack }) => {
 
   return (
     <div className="auth-screen">
-      <FontLoader theme={{ mode:"dark" }}/>
+      <FontLoader/>
       <div className="auth-card">
         {onBack && <button className="btn-cancel" style={{marginBottom:12,fontSize:"0.78rem"}} onClick={onBack}>← back</button>}
         <div className="auth-title">Quotzit</div>
@@ -393,8 +360,8 @@ const QuoteForm = ({ user, myWalls, initial, onSave, onNewWall, onClose }) => {
   const [showNew, setShowNew]= useState(myWalls.length === 0);
   const [date,    setDate]   = useState(initial ? toLocalDate(initial.date) : toLocalDate(now));
   const [time,    setTime]   = useState(initial ? toLocalTime(initial.date) : toLocalTime(now));
-  const [color,   setColor]  = useState(initial?.color   ?? "note-yellow");
-  const [font,    setFont]   = useState(initial?.font    ?? "casual");
+  const [color,   setColor]  = useState(initial?.color   ?? "marker-black");
+  const [font,    setFont]   = useState(initial?.font    ?? "caveat");
   const [saving,  setSaving] = useState(false);
 
   const { listening, start, stop } = useSpeech(t => setText(p => p ? p + " " + t : t));
@@ -417,6 +384,7 @@ const QuoteForm = ({ user, myWalls, initial, onSave, onNewWall, onClose }) => {
       wall_id: finalWallId || null, date: new Date(`${date}T${time}`).toISOString(),
       author_id: user.id, author_name: user.name,
       color, font, rotation: initial?.rotation ?? rand(ROTATIONS),
+      font_size: initial?.font_size ?? randFontSize(),
     };
     if (initial?.id) {
       const { data, error } = await supabase.from("quotes").update(record).eq("id", initial.id).select().single();
@@ -428,7 +396,7 @@ const QuoteForm = ({ user, myWalls, initial, onSave, onNewWall, onClose }) => {
     setSaving(false); onClose();
   };
 
-  const selStyle = { width:"100%", fontFamily:"var(--font-hand)", fontSize:"1rem", padding:"9px 12px", border:"1.5px solid #d4c4a8", borderRadius:2, background:"#fffdf5", color:"var(--ink)", outline:"none" };
+  const selStyle = { width:"100%", fontFamily:"var(--font-ui)", fontSize:"0.95rem", padding:"9px 12px", border:"1.5px solid #ddd", borderRadius:4, background:"#fff", color:"var(--ink)", outline:"none" };
 
   return (
     <Portal>
@@ -452,13 +420,13 @@ const QuoteForm = ({ user, myWalls, initial, onSave, onNewWall, onClose }) => {
         </div>
         <div className="modal-row">
           <div className="field"><label>date</label>
-            <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{width:"100%",border:"1.5px solid #d4c4a8",borderRadius:2,background:"#fffdf5",color:"var(--ink)",outline:"none",fontFamily:"var(--font-hand)",fontSize:"0.95rem",padding:"8px 10px"}} />
+            <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{width:"100%",border:"1.5px solid #ddd",borderRadius:4,background:"#fff",color:"var(--ink)",outline:"none",fontFamily:"var(--font-ui)",fontSize:"0.9rem",padding:"8px 10px"}} />
           </div>
           <div className="field"><label>time</label>
-            <input type="time" value={time} onChange={e=>setTime(e.target.value)} style={{width:"100%",border:"1.5px solid #d4c4a8",borderRadius:2,background:"#fffdf5",color:"var(--ink)",outline:"none",fontFamily:"var(--font-hand)",fontSize:"0.95rem",padding:"8px 10px"}} />
+            <input type="time" value={time} onChange={e=>setTime(e.target.value)} style={{width:"100%",border:"1.5px solid #ddd",borderRadius:4,background:"#fff",color:"var(--ink)",outline:"none",fontFamily:"var(--font-ui)",fontSize:"0.9rem",padding:"8px 10px"}} />
           </div>
         </div>
-        <div className="field"><label>note color</label>
+        <div className="field"><label>marker color</label>
           <div className="swatch-row">
             {COLOR_OPTIONS.map(c=>(
               <div key={c.value} className={`swatch ${color===c.value?"active":""}`} style={{background:c.hex}} onClick={()=>setColor(c.value)} />
@@ -609,7 +577,7 @@ const ShareModal = ({ wall, user, onWallUpdate, onClose }) => {
                 Your personal wall always stays private. Create a separate wall if you want something shareable and public.
               </div>
             ) : (
-            <button className="btn btn-sm" style={{background: visibility==="public_unlisted" ? "var(--note-yellow)" : "none", border:"1.5px solid #ccc", fontFamily:"var(--font-ui)", cursor:"pointer", marginBottom:10}} onClick={togglePublic}>
+            <button className="btn btn-sm" style={{background: visibility==="public_unlisted" ? "rgba(37,98,172,0.1)" : "none", borderColor: visibility==="public_unlisted" ? "var(--ink-blue)" : "#ccc", border:"1.5px solid #ccc", fontFamily:"var(--font-ui)", cursor:"pointer", marginBottom:10}} onClick={togglePublic}>
               {visibility==="public_unlisted" ? "✓ Public (view-only)" : "Make Public (view-only)"}
             </button>
             )}
@@ -637,7 +605,7 @@ const ShareModal = ({ wall, user, onWallUpdate, onClose }) => {
 };
 
 // ── Settings Modal ────────────────────────────────────────────────────────────
-const SettingsModal = ({ user, theme, onThemeChange, onUserUpdate, onDeleteAccount, onClose }) => {
+const SettingsModal = ({ user, onUserUpdate, onDeleteAccount, onClose }) => {
   const [name,     setName]    = useState(user.name);
   const [email,    setEmail]   = useState(user.email);
   const [pass,     setPass]    = useState("");
@@ -645,7 +613,6 @@ const SettingsModal = ({ user, theme, onThemeChange, onUserUpdate, onDeleteAccou
   const [walls,    setWalls]   = useState([]);
   const [saving,   setSaving]  = useState(false);
   const [msg,      setMsg]     = useState("");
-  const fileRef = useRef(null);
 
   useEffect(() => {
     const load = async () => {
@@ -681,16 +648,6 @@ const SettingsModal = ({ user, theme, onThemeChange, onUserUpdate, onDeleteAccou
     setWalls(prev => prev.map(w => w.id===wallId ? {...w, members: w.members.filter(m=>m.user_id!==memberId)} : w));
   };
 
-  const handleBgUpload = e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => onThemeChange({ ...theme, bg: ev.target.result, mode: theme.mode });
-    reader.readAsDataURL(file);
-  };
-
-  const clearBg = () => onThemeChange({ ...theme, bg: null });
-
   return (
     <Portal>
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -714,32 +671,6 @@ const SettingsModal = ({ user, theme, onThemeChange, onUserUpdate, onDeleteAccou
             <input type="password" value={newPass} onChange={e=>setNewPass(e.target.value)} placeholder="leave blank to keep current" />
           </div>
           <button className="btn btn-primary btn-sm" onClick={saveProfile} disabled={saving}>{saving?"saving…":"Save Profile"}</button>
-        </div>
-
-        <hr className="divider"/>
-        <div className="settings-section">
-          <h3>Wall Appearance</h3>
-          <div className="section-label" style={{marginTop:0}}>theme</div>
-          <div className="theme-options">
-            <div className={`theme-chip ${theme.mode==="dark"?"active":""}`}
-              style={{background:"#2c3e4a",color:"#f5efe0"}} onClick={()=>onThemeChange({...theme,mode:"dark"})}>
-              🌙 Dark
-            </div>
-            <div className={`theme-chip ${theme.mode==="light"?"active":""}`}
-              style={{background:"#f0ebe0",color:"#3a2a1a"}} onClick={()=>onThemeChange({...theme,mode:"light"})}>
-              ☀️ Light
-            </div>
-          </div>
-          <div className="section-label">custom background photo</div>
-          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-            <button className="btn btn-ghost btn-sm" style={{background:"#f0ebe0",color:"var(--ink)",border:"1.5px solid #d4c4a8"}}
-              onClick={()=>fileRef.current?.click()}>
-              📷 Upload Photo
-            </button>
-            {theme.bg && <button className="btn btn-sm" style={{background:"#fee2e2",color:"#991b1b",border:"1.5px solid #fca5a5",fontFamily:"var(--font-ui)"}} onClick={clearBg}>Remove</button>}
-            <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleBgUpload}/>
-          </div>
-          {theme.bg && <div style={{marginTop:8,borderRadius:3,overflow:"hidden",maxHeight:100}}><img src={theme.bg} style={{width:"100%",objectFit:"cover",maxHeight:100}}/></div>}
         </div>
 
         <hr className="divider"/>
@@ -779,32 +710,25 @@ const SettingsModal = ({ user, theme, onThemeChange, onUserUpdate, onDeleteAccou
 
 // ── Sticky Note ───────────────────────────────────────────────────────────────
 const StickyNote = ({ quote, wallName, canEdit, canDelete, reactions, onToggleReaction, onEdit, onDelete }) => {
-  const [open, setOpen] = useState(false);
   const fontCss = FONT_MAP[quote.font] || "var(--font-hand)";
+  const inkColor = COLOR_MAP[quote.color] || COLOR_MAP["marker-black"];
   const reactionMap = Object.fromEntries((reactions||[]).map(r=>[r.emoji,r]));
 
   return (
-    <div className={`sticky ${quote.color||"note-yellow"}`}
+    <div className="sticky"
       style={{"--rot":`${quote.rotation||0}deg`, transform:`rotate(${quote.rotation||0}deg)`}}>
       <div className="sticky-actions">
         {canEdit   && <button className="icon-btn" onClick={()=>onEdit(quote)}>✏️</button>}
         {canDelete && <button className="icon-btn" onClick={()=>onDelete(quote.id)}>🗑</button>}
       </div>
-      <div className="sticky-quote" style={{fontFamily:fontCss}}>"{quote.text}"</div>
-      <button className="sticky-toggle" onClick={()=>setOpen(o=>!o)}>
-        <span className={`s-arrow ${open?"open":""}`}>▼</span>
-        <span>{open ? "hide details" : "show details"}</span>
-      </button>
-      {open && (
-        <div className="sticky-meta">
-          {quote.said_by  && <div className="meta-row">👤 {quote.said_by}</div>}
-          {quote.location && <div className="meta-row">📍 {quote.location}</div>}
-          <div className="meta-row">📅 {fmtDate(quote.date)} at {fmtTime(quote.date)}</div>
-          {quote.author_name && <div className="meta-row" style={{color:"#999",fontSize:"0.68rem"}}>added by {quote.author_name}</div>}
-          {wallName && <div><div className="sticky-tag">{wallName}</div></div>}
-        </div>
-      )}
-      {!open && wallName && <div className="sticky-tag">{wallName}</div>}
+      <div className="sticky-quote" style={{fontFamily:fontCss, color:inkColor, fontSize:`${quote.font_size||26}px`}}>{quote.text}</div>
+      <div className="sticky-meta">
+        {quote.said_by  && <div className="meta-row">👤 {quote.said_by}</div>}
+        {quote.location && <div className="meta-row">📍 {quote.location}</div>}
+        <div className="meta-row">📅 {fmtDate(quote.date)} at {fmtTime(quote.date)}</div>
+        {quote.author_name && <div className="meta-row">added by {quote.author_name}</div>}
+        {wallName && <div className="meta-row">{wallName}</div>}
+      </div>
       {onToggleReaction && (
         <div className="reaction-row">
           {REACTION_EMOJIS.map(e => {
@@ -870,7 +794,7 @@ const PublicWall = ({ shareToken }) => {
   if (notFound) {
     return (
       <div className="app-wrapper">
-        <FontLoader theme={{mode:"dark"}}/>
+        <FontLoader/>
         <div className="empty-state"><h2>This wall isn't public (or doesn't exist)</h2></div>
       </div>
     );
@@ -878,13 +802,13 @@ const PublicWall = ({ shareToken }) => {
 
   return (
     <div className="app-wrapper">
-      <FontLoader theme={{mode:"dark"}}/>
+      <FontLoader/>
       <div className="readonly-banner">👀 {wall ? `Viewing "${wall.name}"` : "Loading…"} — view only</div>
       <div style={{padding:"24px 20px 60px",maxWidth:1100,margin:"0 auto"}}>
         {!viewer && (
           <div style={{textAlign:"center",marginBottom:20}}>
             <a href="/" style={{textDecoration:"none"}}><button className="btn btn-primary btn-sm">Make your own wall on Quotzit</button></a>
-            <div style={{fontFamily:"var(--font-ui)",fontSize:"0.72rem",color:"rgba(245,239,224,0.5)",marginTop:6}}>sign in to react to these quotes</div>
+            <div style={{fontFamily:"var(--font-ui)",fontSize:"0.72rem",color:"var(--attribution)",marginTop:6}}>sign in to react to these quotes</div>
           </div>
         )}
         <div className="notes-grid">
@@ -924,15 +848,15 @@ const InviteLanding = ({ token }) => {
     window.location.replace(url.toString());
   };
 
-  if (loading) return <div className="loading"><FontLoader theme={{mode:"dark"}}/>Loading invite…</div>;
-  if (!joinInfo) return <div className="loading"><FontLoader theme={{mode:"dark"}}/>Invalid or expired invite link.</div>;
+  if (loading) return <div className="loading"><FontLoader/>Loading invite…</div>;
+  if (!joinInfo) return <div className="loading"><FontLoader/>Invalid or expired invite link.</div>;
 
   if (screen === "login")  return <AuthScreen initialMode="login"  joinInfo={joinInfo} onAuth={handleAuth} onBack={()=>setScreen("choice")}/>;
   if (screen === "signup") return <AuthScreen initialMode="signup" joinInfo={joinInfo} onAuth={handleAuth} onBack={()=>setScreen("choice")}/>;
 
   return (
     <div className="landing">
-      <FontLoader theme={{mode:"dark"}}/>
+      <FontLoader/>
       <div className="landing-logo">Quotzit</div>
       <div className="landing-tagline">you've been invited ✦</div>
       <div className="landing-quote-wrap">
@@ -974,21 +898,13 @@ export default function Quotzit() {
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [showSettings,setShowSettings]=useState(false);
   const [loading,    setLoading]   = useState(false);
-  const [theme,      setTheme]     = useState(ThemeStore.get);
-  const [wallCovers, setWallCovers]= useState({});
   const [reactionsByQuote, setReactionsByQuote] = useState({});
-  const coverFileRef = useRef(null);
-
-  const handleThemeChange = t => { setTheme(t); ThemeStore.set(t); };
 
   const loadWalls = async (u) => {
     const { data:memberships } = await supabase.from("wall_members").select("wall_id, walls(*)").eq("user_id", u.id);
     const walls = (memberships||[]).map(m=>m.walls).filter(Boolean)
       .sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
     setMyWalls(walls);
-    const covers = {};
-    walls.forEach(w => { if (w.cover_url) covers[w.id] = w.cover_url; });
-    setWallCovers(covers);
     return walls;
   };
 
@@ -1028,27 +944,6 @@ export default function Quotzit() {
   };
 
   const activeWall = myWalls.find(w=>w.id===activeWallId) || null;
-  const isWallOwner = !!activeWall && activeWall.owner_id === user?.id;
-
-  const uploadCoverPhoto = async (file) => {
-    if (!file || !activeWall) return;
-    const ext = file.name.split(".").pop();
-    const path = `${user.id}/${activeWall.id}-${Date.now()}.${ext}`;
-    const { error:upErr } = await supabase.storage.from("group-covers").upload(path, file, { upsert: true });
-    if (upErr) return alert("Upload failed. Please try again.");
-    const { data:urlData } = supabase.storage.from("group-covers").getPublicUrl(path);
-    const url = urlData.publicUrl;
-    await supabase.from("walls").update({ cover_url: url }).eq("id", activeWall.id);
-    setWallCovers(prev => ({ ...prev, [activeWall.id]: url }));
-    setMyWalls(prev => prev.map(w=>w.id===activeWall.id ? {...w, cover_url:url} : w));
-  };
-
-  const removeCoverPhoto = async () => {
-    if (!activeWall) return;
-    await supabase.from("walls").update({ cover_url: null }).eq("id", activeWall.id);
-    setWallCovers(prev => { const n = {...prev}; delete n[activeWall.id]; return n; });
-    setMyWalls(prev => prev.map(w=>w.id===activeWall.id ? {...w, cover_url:null} : w));
-  };
 
   // clear wall param from URL after using it
   useEffect(() => {
@@ -1110,12 +1005,9 @@ export default function Quotzit() {
   if (screen === "login")   return <AuthScreen initialMode="login"  onAuth={handleAuth} onBack={()=>setScreen("landing")}/>;
   if (screen === "signup")  return <AuthScreen initialMode="signup" onAuth={handleAuth} onBack={()=>setScreen("landing")}/>;
 
-  const activeCover = activeWall ? wallCovers[activeWall.id] : null;
-  const effectiveTheme = activeCover ? { ...theme, bg: activeCover } : theme;
-
   return (
-    <div className={`app-wrapper ${(effectiveTheme.bg)?"has-bg":""}`}>
-      <FontLoader theme={effectiveTheme}/>
+    <div className="app-wrapper">
+      <FontLoader/>
 
       <div className="topbar">
         <div className="topbar-logo" onClick={()=>{setActiveWallId(null);clearFilters();}}>Quotzit</div>
@@ -1137,24 +1029,6 @@ export default function Quotzit() {
               onClick={()=>{ activeWall ? setShareWallId(activeWall.id) : setShowGroupPicker(true); }}>
               Share
             </button>
-            {activeWall && isWallOwner && (
-              <>
-                <button className="btn btn-ghost btn-sm"
-                  onClick={()=>coverFileRef.current?.click()}
-                  style={{fontSize:"0.75rem"}}>
-                  {activeCover ? "📷 Change Cover" : "📷 Set Cover"}
-                </button>
-                {activeCover && (
-                  <button className="btn btn-ghost btn-sm"
-                    onClick={removeCoverPhoto}
-                    style={{fontSize:"0.75rem",color:"#f87171",borderColor:"#f87171"}}>
-                    Remove Cover
-                  </button>
-                )}
-                <input ref={coverFileRef} type="file" accept="image/*" style={{display:"none"}}
-                  onChange={e=>{ if(e.target.files[0]) uploadCoverPhoto(e.target.files[0]); }}/>
-              </>
-            )}
           </div>
         </div>
 
@@ -1247,8 +1121,7 @@ export default function Quotzit() {
         </Portal>
       )}
       {showSettings && (
-        <SettingsModal user={user} theme={theme}
-          onThemeChange={handleThemeChange}
+        <SettingsModal user={user}
           onUserUpdate={u=>{ setUser(u); Session.set(u); }}
           onDeleteAccount={deleteAccount}
           onClose={()=>setShowSettings(false)}/>
