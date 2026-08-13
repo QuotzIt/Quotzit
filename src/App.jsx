@@ -325,7 +325,7 @@ const AuthScreen = ({ initialMode="login", joinInfo, onAuth, onBack }) => {
         if (existing) { setErr("That email is already registered."); setLoading(false); return; }
         const { data, error } = await supabase.from("users").insert([{ name, email: email.toLowerCase(), pass }]).select().single();
         if (error) throw error;
-        const { data:wall } = await supabase.from("walls").insert([{ name: "My Wall", owner_id: data.id }]).select().single();
+        const { data:wall } = await supabase.from("walls").insert([{ name: "My Wall", owner_id: data.id, is_personal: true }]).select().single();
         if (wall) await supabase.from("wall_members").insert([{ wall_id: wall.id, user_id: data.id }]);
         if (joinInfo) await joinWall(data.id, joinInfo.wallId);
         Session.set(data); onAuth(data, joinInfo?.wallId);
@@ -547,6 +547,7 @@ const ShareModal = ({ wall, user, onWallUpdate, onClose }) => {
   };
 
   const togglePublic = async () => {
+    if (wall.is_personal) return;
     const nextVis = visibility === "private" ? "public_unlisted" : "private";
     const token = (nextVis === "public_unlisted" && !shareToken) ? genToken() : shareToken;
     const { data, error } = await supabase.from("walls").update({ visibility: nextVis, share_token: token }).eq("id", wall.id).select().single();
@@ -603,10 +604,16 @@ const ShareModal = ({ wall, user, onWallUpdate, onClose }) => {
           <>
             <hr className="divider"/>
             <div className="section-label">public viewing</div>
+            {wall.is_personal ? (
+              <div style={{fontFamily:"var(--font-ui)",fontSize:"0.78rem",color:"#999",fontStyle:"italic"}}>
+                Your personal wall always stays private. Create a separate wall if you want something shareable and public.
+              </div>
+            ) : (
             <button className="btn btn-sm" style={{background: visibility==="public_unlisted" ? "var(--note-yellow)" : "none", border:"1.5px solid #ccc", fontFamily:"var(--font-ui)", cursor:"pointer", marginBottom:10}} onClick={togglePublic}>
               {visibility==="public_unlisted" ? "✓ Public (view-only)" : "Make Public (view-only)"}
             </button>
-            {visibility === "public_unlisted" && (
+            )}
+            {!wall.is_personal && visibility === "public_unlisted" && (
               <>
                 <div style={{fontFamily:"var(--font-ui)",fontSize:"0.72rem",color:"#999",marginBottom:6}}>
                   Anyone with this link can view — even without a Quotzit account. They can't post or join, and reacting needs an account. Never searchable.
