@@ -6,8 +6,8 @@ import { createPortal } from "react-dom";
 const Portal = ({ children }) => createPortal(children, document.body);
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const SUPABASE_URL = "https://uxpdancjavdtkasvxskf.supabase.co";
-const SUPABASE_KEY = "sb_publishable_iYxhoWMNdliIddbtvNBFGQ_lLRZ_Xp0";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
