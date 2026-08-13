@@ -409,9 +409,12 @@ const QuoteForm = ({ user, myWalls, initial, onSave, onNewWall, onClose }) => {
       finalWallId = wall.id;
       onNewWall(wall);
     }
+    const [y, mo, d]  = date.split("-").map(Number);
+    const [h, mi]     = time.split(":").map(Number);
+    const localDate   = new Date(y, mo - 1, d, h, mi);
     const record = {
       text: text.trim(), said_by: saidBy.trim(), location: loc.trim(),
-      wall_id: finalWallId || null, date: new Date(`${date}T${time}`).toISOString(),
+      wall_id: finalWallId || null, date: localDate.toISOString(),
       author_id: user.id, author_name: user.name,
       color, font, rotation: initial?.rotation ?? rand(ROTATIONS),
       font_size: initial?.font_size ?? randFontSize(),
