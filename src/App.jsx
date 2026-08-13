@@ -504,7 +504,6 @@ const QuoteForm = ({ user, myWalls, initial, onSave, onNewWall, onClose }) => {
 const genToken = () => Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 
 const ShareModal = ({ wall, user, onWallUpdate, onClose }) => {
-  const [email,   setEmail]  = useState("");
   const [copied,  setCopied] = useState(false);
   const [members, setMembers]= useState([]);
   const [inviteToken, setInviteToken] = useState("");
@@ -531,16 +530,6 @@ const ShareModal = ({ wall, user, onWallUpdate, onClose }) => {
   const inviteUrl = inviteToken ? `${window.location.origin}?invite=${inviteToken}` : "";
   const publicUrl = shareToken ? `${window.location.origin}?w=${shareToken}` : "";
   const smsBody   = encodeURIComponent(`Psst! Don't forget what we said! Join ${wall.name} on Quotzit! ${inviteUrl}`);
-
-  const addByEmail = async () => {
-    if (!email.trim()) return;
-    const { data:invitee } = await supabase.from("users").select("*").eq("email", email.trim().toLowerCase()).single();
-    if (!invitee) return alert("No Quotzit account found with that email. Send them the invite text to sign up first!");
-    const { error } = await supabase.from("wall_members").insert([{ wall_id: wall.id, user_id: invitee.id }]);
-    if (error) return alert("They may already be on this wall.");
-    setMembers(prev => [...prev, { user_id: invitee.id, users: invitee }]);
-    setEmail("");
-  };
 
   const removeMember = async (memberId) => {
     if (memberId === wall.owner_id) return alert("You can't remove the wall's owner.");
@@ -576,14 +565,7 @@ const ShareModal = ({ wall, user, onWallUpdate, onClose }) => {
           </a>
           <div style={{fontFamily:"var(--font-ui)",fontSize:"0.7rem",color:"#bbb",marginTop:7,textAlign:"center"}}>link lets them join directly — no manual adding needed</div>
         </div>
-        <div className="section-label">add someone with a Quotzit account</div>
-        <div style={{display:"flex",gap:8,marginBottom:4}}>
-          <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="their email"
-            style={{flex:1,fontFamily:"var(--font-hand)",fontSize:"1rem",padding:"8px 11px",border:"1.5px solid #d4c4a8",borderRadius:2,background:"#fffdf5",color:"var(--ink)",outline:"none"}} />
-          <button className="btn btn-primary btn-sm" onClick={addByEmail}>Add</button>
-        </div>
-        <hr className="divider"/>
-        <div className="section-label">current members</div>
+        <div className="section-label" style={{marginTop:0}}>current members</div>
         {members.map((m,i) => (
           <div key={i} className="invite-item">
             <span>{m.users?.name} <span style={{color:"#bbb",fontSize:"0.75rem"}}>({m.users?.email})</span></span>
