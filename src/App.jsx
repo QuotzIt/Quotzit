@@ -15,6 +15,7 @@ const rand = arr => arr[Math.floor(Math.random() * arr.length)];
 const fmtDate = iso => new Date(iso).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" });
 const fmtTime = iso => new Date(iso).toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit" });
 const ROTATIONS = [-3,-2,-1,0,1,2,3];
+const visIcon = w => w?.visibility === "public_unlisted" ? "🌐" : "🔒";
 
 const FONT_OPTIONS = [
   { label:"Casual",  value:"casual",  css:"'Caveat', cursive" },
@@ -475,7 +476,7 @@ const QuoteForm = ({ user, myWalls, initial, onSave, onNewWall, onClose }) => {
           <label>wall</label>
           {!showNew ? (
             <select value={wallId} onChange={e=>{ if(e.target.value==="__new__"){setShowNew(true);}else setWallId(e.target.value); }} style={selStyle}>
-              {myWalls.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
+              {myWalls.map(w=><option key={w.id} value={w.id}>{visIcon(w)} {w.name}</option>)}
               <option value="__new__">+ create new wall</option>
             </select>
           ) : (
@@ -740,7 +741,7 @@ const SettingsModal = ({ user, theme, onThemeChange, onUserUpdate, onDeleteAccou
           {walls.length === 0 && <div style={{fontFamily:"var(--font-ui)",fontSize:"0.85rem",color:"#aaa",fontStyle:"italic"}}>No walls yet — pin a quote to a new wall to start one.</div>}
           {walls.map(w => (
             <div key={w.id} className="group-card">
-              <div className="group-card-title">{w.name}</div>
+              <div className="group-card-title">{visIcon(w)} {w.name}</div>
               {w.members.map((m,i) => (
                 <div key={i} className="invite-item">
                   <span>{m.users?.name} <span style={{color:"#bbb",fontSize:"0.72rem"}}>({m.users?.email})</span></span>
@@ -1123,7 +1124,7 @@ export default function Quotzit() {
         <div className="wall-header">
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div className="wall-title">
-              {activeWall ? activeWall.name : <>The Wall <em>✦</em></>}
+              {activeWall ? <>{visIcon(activeWall)} {activeWall.name}</> : <>The Wall <em>✦</em></>}
             </div>
             <button className="btn btn-ghost btn-sm"
               onClick={()=>{ activeWall ? setShareWallId(activeWall.id) : setShowGroupPicker(true); }}>
@@ -1163,7 +1164,7 @@ export default function Quotzit() {
           {myWalls.length > 0 && (
             <select className="filter-select" value={activeWallId||""} onChange={e=>setActiveWallId(e.target.value||null)}>
               <option value="">All walls</option>
-              {myWalls.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
+              {myWalls.map(w=><option key={w.id} value={w.id}>{visIcon(w)} {w.name}</option>)}
             </select>
           )}
           {whoOptions.length > 0 && (
@@ -1229,7 +1230,7 @@ export default function Quotzit() {
                 {myWalls.map(w=>(
                   <button key={w.id} className="btn btn-ghost" style={{textAlign:"left",justifyContent:"flex-start",color:"var(--ink)",background:"#faf7f2",border:"1.5px solid #e8dfc8",fontFamily:"var(--font-ui)",fontSize:"0.92rem"}}
                     onClick={()=>{ setShowGroupPicker(false); setShareWallId(w.id); }}>
-                    {w.name}
+                    {visIcon(w)} {w.name}
                   </button>
                 ))}
               </div>
