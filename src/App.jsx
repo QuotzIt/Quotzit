@@ -43,12 +43,23 @@ const Session = {
 };
 
 // ── Speech ────────────────────────────────────────────────────────────────────
+const SPEECH_ERROR_MESSAGES = {
+  "not-allowed":     "Microphone access is blocked for this site. Check your browser's site settings (not just the OS-level mic toggle) and allow microphone access for quotzit.com.",
+  "service-not-allowed": "Microphone access is blocked for this site. Check your browser's site settings and allow microphone access for quotzit.com.",
+  "no-speech":        "Didn't catch any speech — try again and speak right after tapping.",
+  "audio-capture":    "No microphone found. Check that one is connected and not in use by another app.",
+  "network":          "Speech recognition needs an internet connection — check yours and try again.",
+  "aborted":           null, // user-initiated stop, not an error worth showing
+};
+
 const useSpeech = onResult => {
   const recRef = useRef(null);
   const [listening, setListening] = useState(false);
+  const [error,     setError]     = useState("");
   const supported = typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
   const start = () => {
-    if (!supported) return alert("Speech recognition requires Chrome or Safari.");
+    setError("");
+    if (!supported) { setError("Speech recognition isn't supported in this browser — try Chrome."); return; }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     const rec = new SR();
     rec.lang = "en-US"; rec.interimResults = false;
@@ -56,12 +67,17 @@ const useSpeech = onResult => {
       const transcript = Array.from(e.results).map(r => r[0].transcript).join(" ").trim();
       if (transcript) setTimeout(() => { onResult(transcript); setListening(false); }, 100);
     };
-    rec.onerror = () => setListening(false);
+    rec.onerror = e => {
+      setListening(false);
+      const msg = SPEECH_ERROR_MESSAGES[e.error];
+      if (msg !== undefined) setError(msg || "");
+      else setError(`Speech recognition error: ${e.error}`);
+    };
     rec.onend   = () => setListening(false);
     recRef.current = rec; rec.start(); setListening(true);
   };
   const stop = () => { recRef.current?.stop(); setListening(false); };
-  return { listening, start, stop };
+  return { listening, start, stop, error };
 };
 
 // ── Global Styles ─────────────────────────────────────────────────────────────
@@ -364,7 +380,7 @@ const QuoteForm = ({ user, myWalls, initial, onSave, onNewWall, onClose }) => {
   const [font,    setFont]   = useState(initial?.font    ?? "caveat");
   const [saving,  setSaving] = useState(false);
 
-  const { listening, start, stop } = useSpeech(t => setText(p => p ? p + " " + t : t));
+  const { listening, start, stop, error:speechError } = useSpeech(t => setText(p => p ? p + " " + t : t));
 
   const save = async () => {
     if (!text.trim()) return;
@@ -407,6 +423,7 @@ const QuoteForm = ({ user, myWalls, initial, onSave, onNewWall, onClose }) => {
         <button className={`mic-btn ${listening?"listening":""}`} onClick={listening?stop:start}>
           {listening ? "🎙 Listening… tap to stop" : "🎙 Tap to speak the quote"}
         </button>
+        {speechError && <div className="auth-error">{speechError}</div>}
         <div className="field"><label>the quote</label>
           <textarea value={text} onChange={e=>setText(e.target.value)} style={{fontFamily:FONT_MAP[font]}} placeholder="what was said?" />
         </div>
