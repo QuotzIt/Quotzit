@@ -207,6 +207,10 @@ const FontLoader = () => {
       .sticky-quote { font-weight:600; line-height:1.4; margin-bottom:10px; word-break:break-word; }
       .sticky-quote::before { content:'\\201C'; }
       .sticky-quote::after  { content:'\\201D'; }
+      .sticky-toggle { font-family:var(--font-ui); font-size:0.7rem; color:var(--attribution); display:flex; align-items:center; gap:4px; cursor:pointer; user-select:none; border:none; background:none; padding:0; margin-top:8px; }
+      .sticky-toggle:hover { color:var(--ink-black); }
+      .s-arrow { font-size:0.6rem; transition:transform 0.18s; display:inline-block; }
+      .s-arrow.open { transform:rotate(180deg); }
       .sticky-meta { font-family:var(--font-ui); font-size:0.74rem; color:var(--attribution); margin-top:8px; display:flex; flex-direction:column; gap:4px; border-top:1px dashed rgba(0,0,0,0.1); padding-top:8px; }
       .meta-row { display:flex; align-items:center; gap:5px; }
 
@@ -727,6 +731,7 @@ const SettingsModal = ({ user, onUserUpdate, onDeleteAccount, onClose }) => {
 
 // ── Sticky Note ───────────────────────────────────────────────────────────────
 const StickyNote = ({ quote, wallName, canEdit, canDelete, reactions, onToggleReaction, onEdit, onDelete }) => {
+  const [open, setOpen] = useState(false);
   const fontCss = FONT_MAP[quote.font] || "var(--font-hand)";
   const inkColor = COLOR_MAP[quote.color] || COLOR_MAP["marker-black"];
   const reactionMap = Object.fromEntries((reactions||[]).map(r=>[r.emoji,r]));
@@ -739,13 +744,19 @@ const StickyNote = ({ quote, wallName, canEdit, canDelete, reactions, onToggleRe
         {canDelete && <button className="icon-btn" onClick={()=>onDelete(quote.id)}>🗑</button>}
       </div>
       <div className="sticky-quote" style={{fontFamily:fontCss, color:inkColor, fontSize:`${quote.font_size||26}px`}}>{quote.text}</div>
-      <div className="sticky-meta">
-        {quote.said_by  && <div className="meta-row">👤 {quote.said_by}</div>}
-        {quote.location && <div className="meta-row">📍 {quote.location}</div>}
-        <div className="meta-row">📅 {fmtDate(quote.date)} at {fmtTime(quote.date)}</div>
-        {quote.author_name && <div className="meta-row">added by {quote.author_name}</div>}
-        {wallName && <div className="meta-row">{wallName}</div>}
-      </div>
+      <button className="sticky-toggle" onClick={()=>setOpen(o=>!o)}>
+        <span className={`s-arrow ${open?"open":""}`}>▾</span>
+        <span>{open ? "hide details" : "details"}</span>
+      </button>
+      {open && (
+        <div className="sticky-meta">
+          {quote.said_by  && <div className="meta-row">👤 {quote.said_by}</div>}
+          {quote.location && <div className="meta-row">📍 {quote.location}</div>}
+          <div className="meta-row">📅 {fmtDate(quote.date)} at {fmtTime(quote.date)}</div>
+          {quote.author_name && <div className="meta-row">added by {quote.author_name}</div>}
+          {wallName && <div className="meta-row">{wallName}</div>}
+        </div>
+      )}
       {onToggleReaction && (
         <div className="reaction-row">
           {REACTION_EMOJIS.map(e => {
