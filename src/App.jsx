@@ -54,6 +54,7 @@ const SPEECH_ERROR_MESSAGES = {
 
 const useSpeech = onResult => {
   const recRef = useRef(null);
+  const transcriptRef = useRef("");
   const [listening, setListening] = useState(false);
   const [error,     setError]     = useState("");
   const supported = typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
@@ -62,18 +63,27 @@ const useSpeech = onResult => {
     if (!supported) { setError("Speech recognition isn't supported in this browser — try Chrome."); return; }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     const rec = new SR();
-    rec.lang = "en-US"; rec.interimResults = false;
+    rec.lang = "en-US";
+    // iOS (Safari, and Chrome-on-iOS since it also runs on WebKit) often never fires a
+    // "final" result — only interim ones. Accumulate whatever comes through as we go and
+    // deliver it on end, rather than waiting for a final result that may never arrive.
+    rec.interimResults = true;
+    rec.continuous = true;
+    transcriptRef.current = "";
     rec.onresult = e => {
-      const transcript = Array.from(e.results).map(r => r[0].transcript).join(" ").trim();
-      if (transcript) setTimeout(() => { onResult(transcript); setListening(false); }, 100);
+      let combined = "";
+      for (let i = 0; i < e.results.length; i++) combined += e.results[i][0].transcript;
+      transcriptRef.current = combined.trim();
     };
     rec.onerror = e => {
-      setListening(false);
       const msg = SPEECH_ERROR_MESSAGES[e.error];
       if (msg !== undefined) setError(msg || "");
       else setError(`Speech recognition error: ${e.error}`);
     };
-    rec.onend   = () => setListening(false);
+    rec.onend = () => {
+      setListening(false);
+      if (transcriptRef.current) onResult(transcriptRef.current);
+    };
     recRef.current = rec; rec.start(); setListening(true);
   };
   const stop = () => { recRef.current?.stop(); setListening(false); };
@@ -207,9 +217,9 @@ const FontLoader = () => {
       .sticky-quote { font-weight:600; line-height:1.4; margin-bottom:10px; word-break:break-word; }
       .sticky-quote::before { content:'\\201C'; }
       .sticky-quote::after  { content:'\\201D'; }
-      .sticky-toggle { font-family:var(--font-ui); font-size:0.7rem; color:var(--attribution); display:flex; align-items:center; gap:4px; cursor:pointer; user-select:none; border:none; background:none; padding:0; margin-top:8px; }
+      .sticky-toggle { display:flex; align-items:center; justify-content:center; width:28px; height:22px; margin-top:6px; cursor:pointer; user-select:none; border:none; background:none; padding:0; color:var(--attribution); }
       .sticky-toggle:hover { color:var(--ink-black); }
-      .s-arrow { font-size:0.6rem; transition:transform 0.18s; display:inline-block; }
+      .s-arrow { font-size:0.85rem; transition:transform 0.18s; display:inline-block; }
       .s-arrow.open { transform:rotate(180deg); }
       .sticky-meta { font-family:var(--font-ui); font-size:0.74rem; color:var(--attribution); margin-top:8px; display:flex; flex-direction:column; gap:4px; border-top:1px dashed rgba(0,0,0,0.1); padding-top:8px; }
       .meta-row { display:flex; align-items:center; gap:5px; }
@@ -744,9 +754,8 @@ const StickyNote = ({ quote, wallName, canEdit, canDelete, reactions, onToggleRe
         {canDelete && <button className="icon-btn" onClick={()=>onDelete(quote.id)}>🗑</button>}
       </div>
       <div className="sticky-quote" style={{fontFamily:fontCss, color:inkColor, fontSize:`${quote.font_size||26}px`}}>{quote.text}</div>
-      <button className="sticky-toggle" onClick={()=>setOpen(o=>!o)}>
+      <button className="sticky-toggle" onClick={()=>setOpen(o=>!o)} aria-label={open ? "hide details" : "show details"}>
         <span className={`s-arrow ${open?"open":""}`}>▾</span>
-        <span>{open ? "hide details" : "details"}</span>
       </button>
       {open && (
         <div className="sticky-meta">
