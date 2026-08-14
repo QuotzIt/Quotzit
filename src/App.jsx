@@ -217,9 +217,9 @@ const FontLoader = () => {
       .sticky-quote { font-weight:600; line-height:1.4; margin-bottom:10px; word-break:break-word; }
       .sticky-quote::before { content:'\\201C'; }
       .sticky-quote::after  { content:'\\201D'; }
-      .sticky-toggle { display:flex; align-items:center; justify-content:center; width:44px; height:38px; margin-top:4px; margin-left:-10px; cursor:pointer; user-select:none; border:none; background:none; padding:0; color:var(--attribution); }
-      .sticky-toggle:hover { color:var(--ink-black); }
-      .s-arrow { font-size:1.3rem; transition:transform 0.18s; display:inline-block; }
+      .sticky-toggle { display:flex; align-items:center; justify-content:center; width:40px; height:40px; margin-top:6px; margin-left:-8px; cursor:pointer; user-select:none; border:none; background:rgba(0,0,0,0.06); border-radius:50%; padding:0; color:var(--attribution); }
+      .sticky-toggle:hover { color:var(--ink-black); background:rgba(0,0,0,0.12); }
+      .s-arrow { font-size:1.6rem; line-height:1; font-weight:700; transition:transform 0.18s; display:inline-block; }
       .s-arrow.open { transform:rotate(180deg); }
       .sticky-meta { font-family:var(--font-ui); font-size:0.74rem; color:var(--attribution); margin-top:8px; display:flex; flex-direction:column; gap:4px; border-top:1px dashed rgba(0,0,0,0.1); padding-top:8px; }
       .meta-row { display:flex; align-items:center; gap:5px; }
@@ -775,7 +775,7 @@ const StickyNote = ({ quote, wallName, canEdit, canDelete, reactions, onToggleRe
       </div>
       <div className="sticky-quote" style={{fontFamily:fontCss, color:inkColor, fontSize:`${quote.font_size||26}px`}}>{quote.text}</div>
       <button className="sticky-toggle" onClick={()=>setOpen(o=>!o)} aria-label={open ? "hide details" : "show details"}>
-        <span className={`s-arrow ${open?"open":""}`}>▾</span>
+        <span className={`s-arrow ${open?"open":""}`}>▼</span>
       </button>
       {open && (
         <div className="sticky-meta">
