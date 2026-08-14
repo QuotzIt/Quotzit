@@ -503,7 +503,7 @@ const QuoteForm = ({ user, myWalls, initial, onSave, onNewWall, onClose }) => {
 // ── Share Modal ───────────────────────────────────────────────────────────────
 const genToken = () => Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 
-const ShareModal = ({ wall, user, onWallUpdate, onClose }) => {
+const ShareModal = ({ wall, user, onWallUpdate, onWallDeleted, onClose }) => {
   const [copied,  setCopied] = useState(false);
   const [members, setMembers]= useState([]);
   const [inviteToken, setInviteToken] = useState("");
@@ -521,7 +521,7 @@ const ShareModal = ({ wall, user, onWallUpdate, onClose }) => {
         await supabase.from("invite_tokens").insert([{ token, wall_id: wall.id }]);
         setInviteToken(token);
       }
-      const { data:mems } = await supabase.from("wall_members").select("user_id, users(id,name,email)").eq("wall_id", wall.id);
+      const { data:mems } = await supabase.from("wall_members").select("user_id, users(id,name)").eq("wall_id", wall.id);
       setMembers(mems || []);
     };
     load();
@@ -549,6 +549,15 @@ const ShareModal = ({ wall, user, onWallUpdate, onClose }) => {
 
   const copy = (url) => navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(()=>setCopied(false), 2200); });
 
+  const deleteWall = async () => {
+    if (!window.confirm(`Delete "${wall.name}"? This permanently removes it and every quote pinned there, for everyone on it. This can't be undone.`)) return;
+    await supabase.from("quotes").delete().eq("wall_id", wall.id);
+    await supabase.from("wall_members").delete().eq("wall_id", wall.id);
+    await supabase.from("invite_tokens").delete().eq("wall_id", wall.id);
+    await supabase.from("walls").delete().eq("id", wall.id);
+    onWallDeleted(wall.id);
+  };
+
   return (
     <Portal>
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -568,7 +577,7 @@ const ShareModal = ({ wall, user, onWallUpdate, onClose }) => {
         <div className="section-label" style={{marginTop:0}}>current members</div>
         {members.map((m,i) => (
           <div key={i} className="invite-item">
-            <span>{m.users?.name} <span style={{color:"#bbb",fontSize:"0.75rem"}}>({m.users?.email})</span></span>
+            <span>{m.users?.name}</span>
             {m.user_id !== wall.owner_id && isOwner && (
               <button onClick={()=>removeMember(m.user_id)}
                 style={{background:"none",border:"none",cursor:"pointer",color:"#dc2626",fontSize:"0.75rem",fontFamily:"var(--font-ui)"}}>
@@ -611,6 +620,14 @@ const ShareModal = ({ wall, user, onWallUpdate, onClose }) => {
           </>
         )}
 
+        {isOwner && !wall.is_personal && (
+          <>
+            <hr className="divider"/>
+            <div className="section-label">danger zone</div>
+            <button className="btn btn-danger btn-sm" onClick={deleteWall}>Delete This Wall</button>
+          </>
+        )}
+
         <div className="modal-actions" style={{marginTop:16}}>
           <button className="btn btn-primary" onClick={onClose}>Done</button>
         </div>
@@ -635,7 +652,7 @@ const SettingsModal = ({ user, onUserUpdate, onDeleteAccount, onClose }) => {
       const { data:owned } = await supabase.from("walls").select("id,name").eq("owner_id", user.id);
       const results = [];
       for (const w of (owned||[])) {
-        const { data:mems } = await supabase.from("wall_members").select("user_id, users(id,name,email)").eq("wall_id", w.id);
+        const { data:mems } = await supabase.from("wall_members").select("user_id, users(id,name)").eq("wall_id", w.id);
         results.push({ ...w, members: mems||[] });
       }
       setWalls(results);
@@ -698,7 +715,7 @@ const SettingsModal = ({ user, onUserUpdate, onDeleteAccount, onClose }) => {
               <div className="group-card-title">{visIcon(w)} {w.name}</div>
               {w.members.map((m,i) => (
                 <div key={i} className="invite-item">
-                  <span>{m.users?.name} <span style={{color:"#bbb",fontSize:"0.72rem"}}>({m.users?.email})</span></span>
+                  <span>{m.users?.name}</span>
                   {m.user_id !== user.id && (
                     <button onClick={()=>removeMember(w.id, m.user_id)}
                       style={{background:"none",border:"none",cursor:"pointer",color:"#dc2626",fontSize:"0.75rem",fontFamily:"var(--font-ui)"}}>
@@ -1117,6 +1134,12 @@ export default function Quotzit() {
       )}
       {shareWallId && <ShareModal wall={myWalls.find(w=>w.id===shareWallId)} user={user}
         onWallUpdate={(w)=>setMyWalls(prev=>prev.map(x=>x.id===w.id?w:x))}
+        onWallDeleted={(wallId)=>{
+          setMyWalls(prev=>prev.filter(w=>w.id!==wallId));
+          setQuotes(prev=>prev.filter(q=>q.wall_id!==wallId));
+          if (activeWallId===wallId) setActiveWallId(null);
+          setShareWallId(null);
+        }}
         onClose={()=>setShareWallId(null)}/>}
       {showGroupPicker && (
         <Portal>
