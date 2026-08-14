@@ -217,9 +217,9 @@ const FontLoader = () => {
       .sticky-quote { font-weight:600; line-height:1.4; margin-bottom:10px; word-break:break-word; }
       .sticky-quote::before { content:'\\201C'; }
       .sticky-quote::after  { content:'\\201D'; }
-      .sticky-toggle { display:flex; align-items:center; justify-content:center; width:28px; height:22px; margin-top:6px; cursor:pointer; user-select:none; border:none; background:none; padding:0; color:var(--attribution); }
+      .sticky-toggle { display:flex; align-items:center; justify-content:center; width:44px; height:38px; margin-top:4px; margin-left:-10px; cursor:pointer; user-select:none; border:none; background:none; padding:0; color:var(--attribution); }
       .sticky-toggle:hover { color:var(--ink-black); }
-      .s-arrow { font-size:0.85rem; transition:transform 0.18s; display:inline-block; }
+      .s-arrow { font-size:1.3rem; transition:transform 0.18s; display:inline-block; }
       .s-arrow.open { transform:rotate(180deg); }
       .sticky-meta { font-family:var(--font-ui); font-size:0.74rem; color:var(--attribution); margin-top:8px; display:flex; flex-direction:column; gap:4px; border-top:1px dashed rgba(0,0,0,0.1); padding-top:8px; }
       .meta-row { display:flex; align-items:center; gap:5px; }
@@ -505,6 +505,7 @@ const genToken = () => Math.random().toString(36).slice(2) + Math.random().toStr
 
 const ShareModal = ({ wall, user, onWallUpdate, onWallDeleted, onClose }) => {
   const [copied,  setCopied] = useState(false);
+  const [name,    setName]   = useState(wall.name);
   const [members, setMembers]= useState([]);
   const [inviteToken, setInviteToken] = useState("");
   const [visibility, setVisibility] = useState(wall.visibility);
@@ -549,6 +550,14 @@ const ShareModal = ({ wall, user, onWallUpdate, onWallDeleted, onClose }) => {
 
   const copy = (url) => navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(()=>setCopied(false), 2200); });
 
+  const renameWall = async () => {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === wall.name) return;
+    const { data, error } = await supabase.from("walls").update({ name: trimmed }).eq("id", wall.id).select().single();
+    if (error) return alert("Couldn't rename wall. Try again.");
+    onWallUpdate(data);
+  };
+
   const deleteWall = async () => {
     if (!window.confirm(`Delete "${wall.name}"? This permanently removes it and every quote pinned there, for everyone on it. This can't be undone.`)) return;
     await supabase.from("quotes").delete().eq("wall_id", wall.id);
@@ -564,6 +573,15 @@ const ShareModal = ({ wall, user, onWallUpdate, onWallDeleted, onClose }) => {
       <div className="modal">
         <button className="modal-close" onClick={onClose}>✕</button>
         <div className="modal-title">Share "{wall.name}"</div>
+        {isOwner && (
+          <div className="field">
+            <label>wall name</label>
+            <div style={{display:"flex",gap:8}}>
+              <input value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&renameWall()} style={{flex:1}} />
+              <button className="btn btn-primary btn-sm" onClick={renameWall} disabled={!name.trim() || name.trim()===wall.name}>Save</button>
+            </div>
+          </div>
+        )}
         <div style={{background:"#fef9e7",border:"1.5px solid #f0d060",borderRadius:3,padding:"14px 16px",marginBottom:18}}>
           <div className="section-label" style={{marginTop:0}}>invite by text</div>
           <div style={{fontFamily:"var(--font-hand)",fontSize:"1rem",color:"var(--ink)",fontStyle:"italic",marginBottom:12}}>
@@ -1024,7 +1042,7 @@ export default function Quotzit() {
 
   // apply all filters
   const visibleQuotes = quotes.filter(q => {
-    if (activeWallId && q.wall_id  !== activeWallId) return false;
+    if (!search && activeWallId && q.wall_id !== activeWallId) return false;
     if (filterWho    && q.said_by  !== filterWho)    return false;
     if (filterWhere  && q.location !== filterWhere)  return false;
     if (search) {
