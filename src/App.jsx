@@ -35,13 +35,6 @@ const randFontSize = () => 22 + Math.floor(Math.random()*13);
 
 const REACTION_EMOJIS = ["❤️","😂","😮","👏","😢"];
 
-// ── Session ───────────────────────────────────────────────────────────────────
-const Session = {
-  get:   () => { try { return JSON.parse(sessionStorage.getItem("qz_user")); } catch { return null; } },
-  set:   u  => sessionStorage.setItem("qz_user", JSON.stringify(u)),
-  clear: () => sessionStorage.removeItem("qz_user"),
-};
-
 // ── Speech ────────────────────────────────────────────────────────────────────
 const SPEECH_ERROR_MESSAGES = {
   "not-allowed":     "Microphone access is blocked for this site. Check your browser's site settings (not just the OS-level mic toggle) and allow microphone access for quotzit.com.",
@@ -318,19 +311,23 @@ const AuthScreen = ({ initialMode="login", joinInfo, onAuth, onBack }) => {
     try {
       if (mode === "signup") {
         if (!name) { setErr("Please enter your name."); setLoading(false); return; }
-        const { data:existing } = await supabase.from("users").select("id").eq("email", email.toLowerCase()).single();
-        if (existing) { setErr("That email is already registered."); setLoading(false); return; }
-        const { data, error } = await supabase.from("users").insert([{ name, email: email.toLowerCase(), pass }]).select().single();
+        const { data:authData, error:authErr } = await supabase.auth.signUp({ email: email.toLowerCase(), password: pass });
+        if (authErr) { setErr(authErr.message === "User already registered" ? "That email is already registered." : authErr.message); setLoading(false); return; }
+        if (!authData.session) { setErr("Check your email to confirm your account, then sign in."); setLoading(false); return; }
+        const uid = authData.user.id;
+        const { data, error } = await supabase.from("users").insert([{ id: uid, name, email: email.toLowerCase() }]).select().single();
         if (error) throw error;
-        const { data:wall } = await supabase.from("walls").insert([{ name: "My Wall", owner_id: data.id, is_personal: true }]).select().single();
-        if (wall) await supabase.from("wall_members").insert([{ wall_id: wall.id, user_id: data.id }]);
-        if (joinInfo) await joinWall(data.id, joinInfo.wallId);
-        Session.set(data); onAuth(data, joinInfo?.wallId);
+        const { data:wall } = await supabase.from("walls").insert([{ name: "My Wall", owner_id: uid, is_personal: true }]).select().single();
+        if (wall) await supabase.from("wall_members").insert([{ wall_id: wall.id, user_id: uid }]);
+        if (joinInfo) await joinWall(uid, joinInfo.wallId);
+        onAuth(data, joinInfo?.wallId);
       } else {
-        const { data, error } = await supabase.from("users").select("*").eq("email", email.toLowerCase()).eq("pass", pass).single();
-        if (error || !data) { setErr("Email or password is incorrect."); setLoading(false); return; }
+        const { data:authData, error:authErr } = await supabase.auth.signInWithPassword({ email: email.toLowerCase(), password: pass });
+        if (authErr) { setErr("Email or password is incorrect."); setLoading(false); return; }
+        const { data, error } = await supabase.from("users").select("*").eq("id", authData.user.id).single();
+        if (error || !data) { setErr("Something went wrong. Please try again."); setLoading(false); return; }
         if (joinInfo) await joinWall(data.id, joinInfo.wallId);
-        Session.set(data); onAuth(data, joinInfo?.wallId);
+        onAuth(data, joinInfo?.wallId);
       }
     } catch(e) { setErr("Something went wrong. Please try again."); }
     setLoading(false);
@@ -680,16 +677,20 @@ const SettingsModal = ({ user, onUserUpdate, onDeleteAccount, onClose }) => {
 
   const saveProfile = async () => {
     setSaving(true); setMsg("");
-    const updates = { name, email: email.toLowerCase() };
     if (newPass) {
       if (!pass) { setMsg("Enter your current password to change it."); setSaving(false); return; }
-      const { data:check } = await supabase.from("users").select("id").eq("id", user.id).eq("pass", pass).single();
-      if (!check) { setMsg("Current password is incorrect."); setSaving(false); return; }
-      updates.pass = newPass;
+      const { error:checkErr } = await supabase.auth.signInWithPassword({ email: user.email, password: pass });
+      if (checkErr) { setMsg("Current password is incorrect."); setSaving(false); return; }
+      const { error:passErr } = await supabase.auth.updateUser({ password: newPass });
+      if (passErr) { setMsg("Couldn't update password. Try again."); setSaving(false); return; }
     }
-    const { data, error } = await supabase.from("users").update(updates).eq("id", user.id).select().single();
+    if (email.toLowerCase() !== user.email) {
+      const { error:emailErr } = await supabase.auth.updateUser({ email: email.toLowerCase() });
+      if (emailErr) { setMsg("Couldn't update email. Try again."); setSaving(false); return; }
+    }
+    const { data, error } = await supabase.from("users").update({ name, email: email.toLowerCase() }).eq("id", user.id).select().single();
     if (error) { setMsg("Something went wrong."); setSaving(false); return; }
-    Session.set(data); onUserUpdate(data);
+    onUserUpdate(data);
     setMsg("Saved!"); setPass(""); setNewPass("");
     setSaving(false);
   };
@@ -823,7 +824,11 @@ const PublicWall = ({ shareToken }) => {
   const [quotes,   setQuotes]  = useState([]);
   const [notFound, setNotFound]= useState(false);
   const [reactionsByQuote, setReactionsByQuote] = useState({});
-  const viewer = Session.get();
+  const [viewerId, setViewerId] = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data:{ session } }) => setViewerId(session?.user?.id || null));
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -832,20 +837,20 @@ const PublicWall = ({ shareToken }) => {
       setWall(w);
       const { data:qs } = await supabase.from("quotes").select("*").eq("wall_id", w.id).order("date", {ascending:false});
       setQuotes(qs || []);
-      if (viewer && qs?.length) setReactionsByQuote(await loadReactionMap(qs.map(q=>q.id), viewer.id));
+      if (viewerId && qs?.length) setReactionsByQuote(await loadReactionMap(qs.map(q=>q.id), viewerId));
     };
     load();
-  }, [shareToken]);
+  }, [shareToken, viewerId]);
 
   const toggleReaction = async (quoteId, emoji) => {
-    if (!viewer) return;
+    if (!viewerId) return;
     const existing = (reactionsByQuote[quoteId]||[]).find(r=>r.emoji===emoji && r.reacted);
     if (existing) {
-      await supabase.from("reactions").delete().eq("quote_id", quoteId).eq("user_id", viewer.id).eq("emoji", emoji);
+      await supabase.from("reactions").delete().eq("quote_id", quoteId).eq("user_id", viewerId).eq("emoji", emoji);
     } else {
-      await supabase.from("reactions").insert([{ quote_id: quoteId, user_id: viewer.id, emoji }]);
+      await supabase.from("reactions").insert([{ quote_id: quoteId, user_id: viewerId, emoji }]);
     }
-    setReactionsByQuote(await loadReactionMap(quotes.map(q=>q.id), viewer.id));
+    setReactionsByQuote(await loadReactionMap(quotes.map(q=>q.id), viewerId));
   };
 
   if (notFound) {
@@ -862,7 +867,7 @@ const PublicWall = ({ shareToken }) => {
       <FontLoader/>
       <div className="readonly-banner">👀 {wall ? `Viewing "${wall.name}"` : "Loading…"} — view only</div>
       <div style={{padding:"24px 20px 60px",maxWidth:1100,margin:"0 auto"}}>
-        {!viewer && (
+        {!viewerId && (
           <div style={{textAlign:"center",marginBottom:20}}>
             <a href="/" style={{textDecoration:"none"}}><button className="btn btn-primary btn-sm">Make your own wall on Quotzit</button></a>
             <div style={{fontFamily:"var(--font-ui)",fontSize:"0.72rem",color:"var(--attribution)",marginTop:6}}>sign in to react to these quotes</div>
@@ -872,7 +877,7 @@ const PublicWall = ({ shareToken }) => {
           {quotes.map(q=>(
             <StickyNote key={q.id} quote={q} canEdit={false} canDelete={false}
               reactions={reactionsByQuote[q.id]}
-              onToggleReaction={viewer ? toggleReaction : null}
+              onToggleReaction={viewerId ? toggleReaction : null}
               onEdit={()=>{}} onDelete={()=>{}}/>
           ))}
         </div>
@@ -941,8 +946,9 @@ export default function Quotzit() {
   if (publicToken) return <PublicWall shareToken={publicToken}/>;
   if (inviteToken) return <InviteLanding token={inviteToken}/>;
 
-  const [user,       setUser]      = useState(Session.get);
-  const [screen,     setScreen]    = useState(user ? "wall" : "landing"); // landing | login | signup | wall
+  const [user,        setUser]       = useState(null);
+  const [authChecked, setAuthChecked]= useState(false);
+  const [screen,     setScreen]    = useState("landing"); // landing | login | signup | wall
   const [quotes,     setQuotes]    = useState([]);
   const [myWalls,    setMyWalls]   = useState([]);
   const [activeWallId, setActiveWallId] = useState(wallParam || null);
@@ -956,6 +962,29 @@ export default function Quotzit() {
   const [showSettings,setShowSettings]=useState(false);
   const [loading,    setLoading]   = useState(false);
   const [reactionsByQuote, setReactionsByQuote] = useState({});
+
+  const loadProfile = async (uid) => {
+    const { data } = await supabase.from("users").select("*").eq("id", uid).single();
+    return data || null;
+  };
+
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(async ({ data:{ session } }) => {
+      if (!active) return;
+      if (session?.user) {
+        const profile = await loadProfile(session.user.id);
+        if (!active) return;
+        if (profile) { setUser(profile); setScreen("wall"); }
+        else { await supabase.auth.signOut(); }
+      }
+      setAuthChecked(true);
+    });
+    const { data:listener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") { setUser(null); setScreen("landing"); setQuotes([]); setMyWalls([]); }
+    });
+    return () => { active = false; listener.subscription.unsubscribe(); };
+  }, []);
 
   const loadWalls = async (u) => {
     const { data:memberships } = await supabase.from("wall_members").select("wall_id, walls(*)").eq("user_id", u.id);
@@ -1028,13 +1057,13 @@ export default function Quotzit() {
   };
 
   const deleteAccount = async () => {
-    await supabase.from("wall_members").delete().eq("user_id", user.id);
-    await supabase.from("quotes").delete().eq("author_id", user.id);
+    // wall_members cascades and quotes.author_id nulls out automatically per the FK setup —
+    // other members keep the wall and its content, this account just stops owning any of it.
     await supabase.from("users").delete().eq("id", user.id);
-    Session.clear(); setUser(null); setScreen("landing");
+    await supabase.auth.signOut(); // onAuthStateChange handles resetting local state
   };
 
-  const logout = () => { Session.clear(); setUser(null); setScreen("landing"); setQuotes([]); setMyWalls([]); };
+  const logout = () => { supabase.auth.signOut(); }; // onAuthStateChange handles resetting local state
 
   // unique filter options
   const whoOptions   = [...new Set(quotes.map(q=>q.said_by).filter(Boolean))].sort();
@@ -1058,6 +1087,7 @@ export default function Quotzit() {
   const clearFilters = () => { setActiveWallId(null); setFilterWho(""); setFilterWhere(""); setSearch(""); };
 
   // ── Screens ──
+  if (!authChecked) return <div className="app-wrapper"><FontLoader/></div>;
   if (screen === "landing") return <LandingPage onSignIn={()=>setScreen("login")} onSignUp={()=>setScreen("signup")}/>;
   if (screen === "login")   return <AuthScreen initialMode="login"  onAuth={handleAuth} onBack={()=>setScreen("landing")}/>;
   if (screen === "signup")  return <AuthScreen initialMode="signup" onAuth={handleAuth} onBack={()=>setScreen("landing")}/>;
@@ -1185,7 +1215,7 @@ export default function Quotzit() {
       )}
       {showSettings && (
         <SettingsModal user={user}
-          onUserUpdate={u=>{ setUser(u); Session.set(u); }}
+          onUserUpdate={u=>setUser(u)}
           onDeleteAccount={deleteAccount}
           onClose={()=>setShowSettings(false)}/>
       )}
